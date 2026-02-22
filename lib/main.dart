@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 
 void main() {
   runApp(const StudyControlApp());
@@ -20,6 +21,8 @@ class StudyControlApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         scaffoldBackgroundColor: const Color(0xFFFAF8FF),
+        dialogBackgroundColor: const Color(0xFFFAF8FF),
+        canvasColor: const Color(0xFFFAF8FF),
       ),
       debugShowCheckedModeBanner: false,
       home: const MainScreen(),
@@ -59,6 +62,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFAF8FF),
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -158,7 +162,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .map((json) => ExamAssignment.fromJson(jsonDecode(json)))
         .toList();
 
-    // Filter exams that haven't passed
     final activeExams = exams
         .where((e) {
       final daysRemaining = _getDaysRemaining(e.dueDate);
@@ -178,7 +181,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .map((json) => Assignment.fromJson(jsonDecode(json)))
         .toList();
 
-    // Count only non-exam assignments
     final nonExamAssignments = assignments
         .where((a) => !a.isExam)
         .toList();
@@ -305,6 +307,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _deleteExam(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    _exams.removeAt(index);
+    final examsJson =
+        _exams.map((e) => jsonEncode(e.toJson())).toList();
+    await prefs.setStringList('exams', examsJson);
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Exam deleted successfully'),
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -671,127 +688,143 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final daysRemaining = _getDaysRemaining(exam.dueDate);
     final isCompleted = exam.status == 'Completed';
 
-    return GestureDetector(
-      onLongPress: () => _editExam(context, index),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0F9FF),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isCompleted
-                  ? const Color(0xFFD1FAE5).withOpacity(0.5)
-                  : const Color(0xFFBAE6FD).withOpacity(0.5),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F9FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isCompleted
+              ? const Color(0xFFD1FAE5).withOpacity(0.5)
+              : const Color(0xFFBAE6FD).withOpacity(0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          padding: const EdgeInsets.all(16),
-          child: Row(
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isCompleted
+                  ? const Color(0xFFD1FAE5)
+                  : const Color(0xFFE0F2FE),
+            ),
+            child: const Center(
+              child: Text('📚', style: TextStyle(fontSize: 24)),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exam.name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3F3F3F),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  exam.subject,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  exam.dueDate,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Container(
-                width: 50,
-                height: 50,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
                   color: isCompleted
                       ? const Color(0xFFD1FAE5)
                       : const Color(0xFFE0F2FE),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Center(
-                  child: Text('📚', style: TextStyle(fontSize: 24)),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exam.name,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF3F3F3F),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      exam.subject,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      exam.dueDate,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  exam.status,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: isCompleted
+                        ? const Color(0xFF047857)
+                        : const Color(0xFF0369A1),
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? const Color(0xFFD1FAE5)
-                          : const Color(0xFFE0F2FE),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      exam.status,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: isCompleted
-                            ? const Color(0xFF047857)
-                            : const Color(0xFF0369A1),
-                      ),
+              const SizedBox(height: 6),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    _editExam(context, index);
+                  } else if (value == 'delete') {
+                    _deleteExam(index);
+                  }
+                },
+                itemBuilder: (BuildContext context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  if (daysRemaining > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3E8FF),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '$daysRemaining days',
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF7C3AED),
-                        ),
-                      ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
                     ),
+                  ),
                 ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3E8FF),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.more_vert, size: 16, color: Color(0xFFD5B8E0)),
+                ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1126,69 +1159,103 @@ class _TaskScreenState extends State<TaskScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Task'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: InputDecoration(
-                hintText: 'Task title',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFFFAF8FF),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Add New Task',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3F3F3F),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: timeController,
-              decoration: InputDecoration(
-                hintText: 'Time (HH:MM)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 20),
+              TextField(
+                controller: titleController,
+                decoration: InputDecoration(
+                  hintText: 'Task title',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButton<String>(
-              value: priority,
-              isExpanded: true,
-              items: ['Low', 'Medium', 'High']
-                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                  .toList(),
-              onChanged: (value) {
-                priority = value ?? 'Medium';
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (titleController.text.isNotEmpty &&
-                  timeController.text.isNotEmpty) {
-                setState(() {
-                  tasks.add(
-                    Task(
-                      title: titleController.text,
-                      time: timeController.text,
-                      isCompleted: false,
-                      priority: priority,
+              const SizedBox(height: 12),
+              TextField(
+                controller: timeController,
+                decoration: InputDecoration(
+                  hintText: 'Time (HH:MM)',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: DropdownButton<String>(
+                  value: priority,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: ['Low', 'Medium', 'High']
+                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                      .toList(),
+                  onChanged: (value) {
+                    priority = value ?? 'Medium';
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (titleController.text.isNotEmpty &&
+                          timeController.text.isNotEmpty) {
+                        setState(() {
+                          tasks.add(
+                            Task(
+                              title: titleController.text,
+                              time: timeController.text,
+                              isCompleted: false,
+                              priority: priority,
+                            ),
+                          );
+                        });
+                        _saveTasks();
+                        Navigator.pop(context);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD5B8E0),
+                      foregroundColor: Colors.white,
                     ),
-                  );
-                });
-                _saveTasks();
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Add'),
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1202,64 +1269,98 @@ class _TaskScreenState extends State<TaskScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Task'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: InputDecoration(
-                hintText: 'Task title',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFFFAF8FF),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Edit Task',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3F3F3F),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: timeController,
-              decoration: InputDecoration(
-                hintText: 'Time (HH:MM)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 20),
+              TextField(
+                controller: titleController,
+                decoration: InputDecoration(
+                  hintText: 'Task title',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButton<String>(
-              value: priority,
-              isExpanded: true,
-              items: ['Low', 'Medium', 'High']
-                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                  .toList(),
-              onChanged: (value) {
-                priority = value ?? 'Medium';
-              },
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: timeController,
+                decoration: InputDecoration(
+                  hintText: 'Time (HH:MM)',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: DropdownButton<String>(
+                  value: priority,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: ['Low', 'Medium', 'High']
+                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                      .toList(),
+                  onChanged: (value) {
+                    priority = value ?? 'Medium';
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (titleController.text.isNotEmpty &&
+                          timeController.text.isNotEmpty) {
+                        setState(() {
+                          tasks[index].title = titleController.text;
+                          tasks[index].time = timeController.text;
+                          tasks[index].priority = priority;
+                        });
+                        _saveTasks();
+                        Navigator.pop(context);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD5B8E0),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (titleController.text.isNotEmpty &&
-                  timeController.text.isNotEmpty) {
-                setState(() {
-                  tasks[index].title = titleController.text;
-                  tasks[index].time = timeController.text;
-                  tasks[index].priority = priority;
-                });
-                _saveTasks();
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }
@@ -1518,7 +1619,6 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter assignments - exclude exam assignments
     final nonExamAssignments = assignments
         .where((a) => !a.isExam)
         .toList();
@@ -1815,7 +1915,6 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                             ),
                           );
 
-                          // If it's an exam, also add to exams list
                           if (isExam) {
                             _addExamToList(
                               nameController.text,
@@ -1866,7 +1965,6 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   }
 
   void _editAssignment(BuildContext context, int index) {
-    // Find the actual assignment in the full list
     final nonExamAssignments = assignments.where((a) => !a.isExam).toList();
     final assignmentToEdit = nonExamAssignments[index];
 
@@ -2494,74 +2592,89 @@ class _NotesScreenState extends State<NotesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Files (PDF, PPTX, DOCS)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade700,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Files (PDF, PPTX, DOCS)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () async {
+                            try {
+                              FilePickerResult? result = await FilePicker.platform
+                                  .pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: ['pdf', 'pptx', 'docx', 'doc'],
+                                allowMultiple: true,
+                              );
+
+                              if (result != null) {
+                                setState(() {
+                                  for (var file in result.files) {
+                                    files.add(file.name);
+                                  }
+                                });
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error picking file: $e'),
+                                ),
+                              );
+                            }
+                          },
+                          child: const Icon(Icons.add,
+                              color: Color(0xFFD5B8E0), size: 20),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () {
-                        // Simulate file selection
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'File picker integration required for production'),
+                    if (files.isEmpty)
+                      Text(
+                        'No files added',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                      )
+                    else
+                      ...files.asMap().entries.map((entry) {
+                        int fileIndex = entry.key;
+                        String file = entry.value;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.description,
+                                  size: 16,
+                                  color: Color(0xFFD5B8E0)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  file,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    files.removeAt(fileIndex);
+                                  });
+                                },
+                                child: const Icon(Icons.close,
+                                    size: 16, color: Colors.red),
+                              ),
+                            ],
                           ),
                         );
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: const Color(0xFFD5B8E0),
-                            width: 1,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 12, horizontal: 16),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.attach_file,
-                                color: Color(0xFFD5B8E0), size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Add Files',
-                              style: TextStyle(
-                                color: Color(0xFFD5B8E0),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (files.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      ...files.map((file) => Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.description,
-                                    size: 16,
-                                    color: Color(0xFFD5B8E0)),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    file,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )),
-                    ],
+                      }).toList(),
                   ],
                 ),
               ),
@@ -2729,13 +2842,31 @@ class _NotesScreenState extends State<NotesScreen> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'File picker integration required'),
-                              ),
-                            );
+                          onTap: () async {
+                            try {
+                              FilePickerResult? result = await FilePicker.platform
+                                  .pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: ['pdf', 'pptx', 'docx', 'doc'],
+                                allowMultiple: true,
+                              );
+
+                              if (result != null) {
+                                setState(() {
+                                  for (var file in result.files) {
+                                    if (!files.contains(file.name)) {
+                                      files.add(file.name);
+                                    }
+                                  }
+                                });
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error picking file: $e'),
+                                ),
+                              );
+                            }
                           },
                           child: const Icon(Icons.add,
                               color: Color(0xFFD5B8E0), size: 20),
