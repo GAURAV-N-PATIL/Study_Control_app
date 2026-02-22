@@ -86,8 +86,12 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  String subjectName = "Mathematics";
-  DateTime examDate = DateTime.now().add(const Duration(days: 5));
+  // List of subjects + exam dates
+  List<String> subjects = [];
+  List<DateTime> examDates = [];
+
+  // Example habit/task progress (0.0–1.0)
+  double progress = 0.65;
 
   @override
   void initState() {
@@ -95,37 +99,115 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadExamData();
   }
 
+  // Load subjects & exams from SharedPreferences
   Future<void> _loadExamData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      subjectName = prefs.getString('subjectName') ?? 'Mathematics';
-      int? savedDate = prefs.getInt('examDate');
-      examDate = savedDate != null
-          ? DateTime.fromMillisecondsSinceEpoch(savedDate)
-          : DateTime.now().add(const Duration(days: 5));
+      subjects = prefs.getStringList('subjects') ?? ['Mathematics'];
+      List<String>? savedDates = prefs.getStringList('examDates');
+      if (savedDates != null) {
+        examDates =
+            savedDates.map((s) => DateTime.fromMillisecondsSinceEpoch(int.parse(s))).toList();
+      } else {
+        examDates = [DateTime.now().add(const Duration(days: 5))];
+      }
     });
   }
 
+  // Save subjects & exams
   Future<void> _saveExamData() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('subjectName', subjectName);
-    await prefs.setInt('examDate', examDate.millisecondsSinceEpoch);
+    await prefs.setStringList('subjects', subjects);
+    await prefs.setStringList(
+        'examDates', examDates.map((d) => d.millisecondsSinceEpoch.toString()).toList());
+  }
+
+  // Popup dialog to edit a subject
+  Future<void> _editExamDialog(int index) async {
+    TextEditingController subjectController =
+        TextEditingController(text: subjects[index]);
+    DateTime tempDate = examDates[index];
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text("Edit Exam"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: subjectController,
+                  decoration: const InputDecoration(labelText: "Subject Name"),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    const Text("Exam Date: "),
+                    Text(
+                      "${tempDate.day}/${tempDate.month}/${tempDate.year}",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () async {
+                        DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: tempDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setDialogState(() {
+                            tempDate = picked;
+                          });
+                        }
+                      },
+                      child: const Text("Change"),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  subjects[index] = subjectController.text;
+                  examDates[index] = tempDate;
+                  _saveExamData();
+                  setState(() {});
+                  Navigator.pop(context);
+                },
+                child: const Text("Save"),
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
+
+  // Add new subject
+  void _addNewExam() {
+    setState(() {
+      subjects.add("New Subject");
+      examDates.add(DateTime.now().add(const Duration(days: 7)));
+    });
+    _saveExamData();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Calculate days left for upcoming exam
-    int daysLeft = examDate.difference(DateTime.now()).inDays;
-
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addNewExam,
+        child: const Icon(Icons.add),
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF6A5AE0),
-              Color(0xFF8E7BFF),
-              Color(0xFF5F9CFF),
-            ],
+            colors: [Color(0xFF6A5AE0), Color(0xFF8E7BFF), Color(0xFF5F9CFF)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -135,10 +217,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(20),
             child: ListView(
               children: [
-
                 const SizedBox(height: 20),
-
-                // Dashboard Title
                 const Text(
                   "Dashboard",
                   style: TextStyle(
@@ -147,25 +226,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 30),
 
-                // Upcoming Exam Card (tap-enabled)
-                _examCard(),
+                // Circular Progress Card
+                _progressCard(progress),
 
                 const SizedBox(height: 20),
 
-                // Example: Today's Progress Card
-                _progressCard(0.65), // replace 0.65 with your dynamic value later
+                // Assignments Card (dummy example)
+                _infoCard(title: "Assignments", content: "3 Active • 1 Overdue"),
 
                 const SizedBox(height: 20),
 
-                // Example: Assignments Card
-                _infoCard(
-                  title: "Assignments",
-                  content: "3 Active • 1 Overdue",
+                const Text(
+                  "Upcoming Tests",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
+                const SizedBox(height: 15),
 
+                // List of subjects / exam cards
+                ...List.generate(subjects.length, (index) {
+                  int daysLeft = examDates[index].difference(DateTime.now()).inDays;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 15),
+                    child: GestureDetector(
+                      onTap: () => _editExamDialog(index),
+                      child: _examCard(subjects[index], daysLeft),
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -174,107 +267,98 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _examCard() {
-    int daysLeft = examDate.difference(DateTime.now()).inDays;
-
-    return GestureDetector(
-      onTap: _editExamDialog, // opens the edit popup
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(25),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Upcoming Test",
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
+  // Exam card widget
+  Widget _examCard(String subjectName, int daysLeft) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Upcoming Test",
+            style: TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "$subjectName • $daysLeft days left",
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            Text(
-              "$subjectName • $daysLeft days left",
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Future<void> _editExamDialog() async {
-    TextEditingController subjectController =
-        TextEditingController(text: subjectName);
-
-    DateTime tempDate = examDate;
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text("Edit Exam"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: subjectController,
-                    decoration: const InputDecoration(labelText: "Subject Name"),
+  // Circular progress card
+  Widget _progressCard(double progress) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            height: 90,
+            width: 90,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 8,
+                  backgroundColor: Colors.white24,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+                Text(
+                  "${(progress * 100).toInt()}%",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      const Text("Exam Date: "),
-                      Text(
-                        "${tempDate.day}/${tempDate.month}/${tempDate.year}",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () async {
-                          DateTime? picked = await showDatePicker(
-                            context: context,
-                            initialDate: tempDate,
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime(2100),
-                          );
-                          if (picked != null) {
-                            setDialogState(() {
-                              tempDate = picked;
-                            });
-                          }
-                        },
-                        child: const Text("Change"),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    subjectName = subjectController.text;
-                    examDate = tempDate;
-                    _saveExamData();
-                    setState(() {}); // refresh dashboard
-                    Navigator.pop(context);
-                  },
-                  child: const Text("Save"),
                 ),
               ],
-            );
-          },
-        );
-      },
+            ),
+          ),
+          const SizedBox(width: 20),
+          const Expanded(
+            child: Text(
+              "Today's Overall Progress\n(Habits + Tasks)",
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+          ),
+        ],
+      ),
     );
   }
+
+  // Info card for assignments or other summary
+  Widget _infoCard({required String title, required String content}) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+          const SizedBox(height: 6),
+          Text(content,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
 }
