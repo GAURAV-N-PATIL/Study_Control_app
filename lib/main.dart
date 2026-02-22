@@ -46,6 +46,7 @@ class _MainScreenState extends State<MainScreen> {
       DashboardScreen(onTabChange: _onTabChange),
       const TaskScreen(),
       const AssignmentsScreen(),
+      const NotesScreen(),
     ];
   }
 
@@ -84,6 +85,10 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.assignment_rounded),
             label: 'Assignment',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.note_rounded),
+            label: 'Notes',
+          ),
         ],
       ),
     );
@@ -105,7 +110,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _completedTasks = 0;
   int _totalTasks = 0;
   List<Task> _highPriorityTasks = [];
-  List<Exam> _exams = [];
+  List<ExamAssignment> _exams = [];
   int _totalAssignments = 0;
   int _completedAssignments = 0;
   int _pendingAssignments = 0;
@@ -148,29 +153,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadExams() async {
     final prefs = await SharedPreferences.getInstance();
-    final assignmentsJson = prefs.getStringList('assignments') ?? [];
-    final assignments = assignmentsJson
-        .map((json) => Assignment.fromJson(jsonDecode(json)))
+    final examsJson = prefs.getStringList('exams') ?? [];
+    final exams = examsJson
+        .map((json) => ExamAssignment.fromJson(jsonDecode(json)))
         .toList();
 
-    // Filter assignments where name contains "exam" (case-insensitive) and haven't passed
-    final examAssignments = assignments
-        .where((a) => a.name.toLowerCase().contains('exam'))
-        .where((a) {
-      final daysRemaining = _getDaysRemaining(a.dueDate);
-      return daysRemaining >= 0; // Only show if exam day hasn't passed
+    // Filter exams that haven't passed
+    final activeExams = exams
+        .where((e) {
+      final daysRemaining = _getDaysRemaining(e.dueDate);
+      return daysRemaining >= 0;
     })
-        .map((a) => Exam(
-              title: a.name,
-              description: a.subject,
-              date: a.dueDate,
-              status: a.status == 'Completed' ? 'Completed' : 'Incoming',
-              icon: '📚',
-            ))
         .toList();
 
     setState(() {
-      _exams = examAssignments;
+      _exams = activeExams;
     });
   }
 
@@ -181,10 +178,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .map((json) => Assignment.fromJson(jsonDecode(json)))
         .toList();
 
+    // Count only non-exam assignments
+    final nonExamAssignments = assignments
+        .where((a) => !a.isExam)
+        .toList();
+
     setState(() {
-      _totalAssignments = assignments.length;
+      _totalAssignments = nonExamAssignments.length;
       _completedAssignments =
-          assignments.where((a) => a.status == 'Completed').length;
+          nonExamAssignments.where((a) => a.status == 'Completed').length;
       _pendingAssignments = _totalAssignments - _completedAssignments;
     });
   }
@@ -204,6 +206,107 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Handle error silently
     }
     return 0;
+  }
+
+  void _editExam(BuildContext context, int index) {
+    final TextEditingController nameController =
+        TextEditingController(text: _exams[index].name);
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFFFAF8FF),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Edit Exam',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3F3F3F),
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  hintText: 'Exam name',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (nameController.text.isNotEmpty) {
+                        final prefs = await SharedPreferences.getInstance();
+                        _exams[index].name = nameController.text;
+
+                        final examsJson = _exams
+                            .map((e) => jsonEncode(e.toJson()))
+                            .toList();
+                        await prefs.setStringList('exams', examsJson);
+
+                        setState(() {});
+                        Navigator.pop(context);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD5B8E0),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -552,135 +655,142 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           )
         else
-          ..._exams.map((exam) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildExamCard(exam),
-              )).toList(),
+          ..._exams.asMap().entries.map((entry) {
+            int index = entry.key;
+            ExamAssignment exam = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildExamCard(exam, index),
+            );
+          }).toList(),
       ],
     );
   }
 
-  Widget _buildExamCard(Exam exam) {
-    final daysRemaining = _getDaysRemaining(exam.date);
+  Widget _buildExamCard(ExamAssignment exam, int index) {
+    final daysRemaining = _getDaysRemaining(exam.dueDate);
     final isCompleted = exam.status == 'Completed';
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0F9FF),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isCompleted
-                ? const Color(0xFFD1FAE5).withOpacity(0.5)
-                : const Color(0xFFBAE6FD).withOpacity(0.5),
-            width: 1.5,
+    return GestureDetector(
+      onLongPress: () => _editExam(context, index),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F9FF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isCompleted
+                  ? const Color(0xFFD1FAE5).withOpacity(0.5)
+                  : const Color(0xFFBAE6FD).withOpacity(0.5),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isCompleted
-                    ? const Color(0xFFD1FAE5)
-                    : const Color(0xFFE0F2FE),
-              ),
-              child: Center(
-                child: Text(exam.icon, style: const TextStyle(fontSize: 24)),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    exam.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF3F3F3F),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    exam.description,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    exam.date,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade500,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? const Color(0xFFD1FAE5)
-                        : const Color(0xFFE0F2FE),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    exam.status,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: isCompleted
-                          ? const Color(0xFF047857)
-                          : const Color(0xFF0369A1),
-                    ),
-                  ),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isCompleted
+                      ? const Color(0xFFD1FAE5)
+                      : const Color(0xFFE0F2FE),
                 ),
-                const SizedBox(height: 6),
-                if (daysRemaining > 0)
+                child: const Center(
+                  child: Text('📚', style: TextStyle(fontSize: 24)),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exam.name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF3F3F3F),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      exam.subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      exam.dueDate,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3E8FF),
-                      borderRadius: BorderRadius.circular(6),
+                      color: isCompleted
+                          ? const Color(0xFFD1FAE5)
+                          : const Color(0xFFE0F2FE),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '$daysRemaining days',
-                      style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF7C3AED),
+                      exam.status,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: isCompleted
+                            ? const Color(0xFF047857)
+                            : const Color(0xFF0369A1),
                       ),
                     ),
                   ),
-              ],
-            ),
-          ],
+                  const SizedBox(height: 6),
+                  if (daysRemaining > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3E8FF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '$daysRemaining days',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF7C3AED),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -803,17 +913,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'Opening reminders...'),
-                    ),
-                  );
-                },
+                onTap: () => widget.onTabChange(3),
                 child: _buildQuickLinkCard(
-                  icon: Icons.notifications,
-                  label: 'Reminders',
+                  icon: Icons.note,
+                  label: 'Notes',
                   color: const Color(0xFF8B5CF6),
                 ),
               ),
@@ -1336,38 +1439,38 @@ class Task {
   }
 }
 
-class Exam {
-  String title;
-  String description;
-  String date;
+class ExamAssignment {
+  String name;
+  String subject;
+  String dueDate;
   String status;
-  String icon;
+  bool isExam;
 
-  Exam({
-    required this.title,
-    required this.description,
-    required this.date,
+  ExamAssignment({
+    required this.name,
+    required this.subject,
+    required this.dueDate,
     required this.status,
-    required this.icon,
+    this.isExam = true,
   });
 
   Map<String, dynamic> toJson() {
     return {
-      'title': title,
-      'description': description,
-      'date': date,
+      'name': name,
+      'subject': subject,
+      'dueDate': dueDate,
       'status': status,
-      'icon': icon,
+      'isExam': isExam,
     };
   }
 
-  factory Exam.fromJson(Map<String, dynamic> json) {
-    return Exam(
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
-      date: json['date'] ?? '',
+  factory ExamAssignment.fromJson(Map<String, dynamic> json) {
+    return ExamAssignment(
+      name: json['name'] ?? '',
+      subject: json['subject'] ?? '',
+      dueDate: json['dueDate'] ?? '',
       status: json['status'] ?? 'Incoming',
-      icon: json['icon'] ?? '📝',
+      isExam: json['isExam'] ?? true,
     );
   }
 }
@@ -1407,11 +1510,17 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
     await prefs.setStringList('assignments', assignmentsJson);
   }
 
+  Future<void> _saveExams(List<ExamAssignment> exams) async {
+    final prefs = await SharedPreferences.getInstance();
+    final examsJson = exams.map((e) => jsonEncode(e.toJson())).toList();
+    await prefs.setStringList('exams', examsJson);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Filter assignments - exclude exam assignments
     final nonExamAssignments = assignments
-        .where((a) => !a.name.toLowerCase().contains('exam'))
+        .where((a) => !a.isExam)
         .toList();
 
     return Scaffold(
@@ -1480,7 +1589,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                       onDelete: () {
                         setState(() {
                           assignments.removeWhere(
-                              (a) => a.name == assignment.name && a.subject == assignment.subject);
+                              (a) => a.name == assignment.name && a.subject == assignment.subject && !a.isExam);
                         });
                         _saveAssignments();
                       },
@@ -1695,14 +1804,26 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                           subjectController.text.isNotEmpty &&
                           dueDateController.text.isNotEmpty) {
                         setState(() {
+                          bool isExam = nameController.text.toLowerCase().contains('exam');
                           assignments.add(
                             Assignment(
                               name: nameController.text,
                               subject: subjectController.text,
                               dueDate: dueDateController.text,
                               status: status,
+                              isExam: isExam,
                             ),
                           );
+
+                          // If it's an exam, also add to exams list
+                          if (isExam) {
+                            _addExamToList(
+                              nameController.text,
+                              subjectController.text,
+                              dueDateController.text,
+                              status,
+                            );
+                          }
                         });
                         _saveAssignments();
                         Navigator.pop(context);
@@ -1726,16 +1847,28 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
     );
   }
 
+  void _addExamToList(String name, String subject, String dueDate, String status) async {
+    final prefs = await SharedPreferences.getInstance();
+    final examsJson = prefs.getStringList('exams') ?? [];
+    final exams = examsJson
+        .map((json) => ExamAssignment.fromJson(jsonDecode(json)))
+        .toList();
+
+    exams.add(ExamAssignment(
+      name: name,
+      subject: subject,
+      dueDate: dueDate,
+      status: status,
+      isExam: true,
+    ));
+
+    await _saveExams(exams);
+  }
+
   void _editAssignment(BuildContext context, int index) {
     // Find the actual assignment in the full list
-    final assignmentToEdit = assignments.firstWhere(
-      (a) =>
-          a.name ==
-          assignments
-              .where((x) => !x.name.toLowerCase().contains('exam'))
-              .toList()[index]
-              .name,
-    );
+    final nonExamAssignments = assignments.where((a) => !a.isExam).toList();
+    final assignmentToEdit = nonExamAssignments[index];
 
     final TextEditingController nameController =
         TextEditingController(text: assignmentToEdit.name);
@@ -2100,12 +2233,14 @@ class Assignment {
   String subject;
   String dueDate;
   String status;
+  bool isExam;
 
   Assignment({
     required this.name,
     required this.subject,
     required this.dueDate,
     required this.status,
+    this.isExam = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -2114,6 +2249,7 @@ class Assignment {
       'subject': subject,
       'dueDate': dueDate,
       'status': status,
+      'isExam': isExam,
     };
   }
 
@@ -2123,6 +2259,739 @@ class Assignment {
       subject: json['subject'] ?? '',
       dueDate: json['dueDate'] ?? '',
       status: json['status'] ?? 'Not started yet',
+      isExam: json['isExam'] ?? false,
+    );
+  }
+}
+
+class NotesScreen extends StatefulWidget {
+  const NotesScreen({Key? key}) : super(key: key);
+
+  @override
+  State<NotesScreen> createState() => _NotesScreenState();
+}
+
+class _NotesScreenState extends State<NotesScreen> {
+  List<Note> notes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotes();
+  }
+
+  Future<void> _loadNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final notesJson = prefs.getStringList('notes') ?? [];
+    if (notesJson.isNotEmpty) {
+      setState(() {
+        notes = notesJson
+            .map((json) => Note.fromJson(jsonDecode(json)))
+            .toList();
+      });
+    }
+  }
+
+  Future<void> _saveNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final notesJson = notes.map((n) => jsonEncode(n.toJson())).toList();
+    await prefs.setStringList('notes', notesJson);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAF8FF),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: const Text(
+          'Notes',
+          style: TextStyle(
+            fontWeight: FontWeight.w300,
+            color: Color(0xFF3F3F3F),
+            fontSize: 32,
+            letterSpacing: 0.5,
+          ),
+        ),
+        centerTitle: false,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${notes.length} note${notes.length != 1 ? 's' : ''}',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (notes.isEmpty)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: Text(
+                      'No notes yet',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...notes.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  Note note = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: NoteCard(
+                      note: note,
+                      onEdit: () => _editNote(context, index),
+                      onDelete: () {
+                        setState(() {
+                          notes.removeAt(index);
+                        });
+                        _saveNotes();
+                      },
+                    ),
+                  );
+                }).toList(),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _addNote(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Note'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD5B8E0),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _addNote(BuildContext context) {
+    final TextEditingController subjectController = TextEditingController();
+    final TextEditingController topicController = TextEditingController();
+    List<String> files = [];
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFFFAF8FF),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Add New Note',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3F3F3F),
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: subjectController,
+                decoration: InputDecoration(
+                  hintText: 'Subject',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: topicController,
+                decoration: InputDecoration(
+                  hintText: 'Topic',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(
+                    color: Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Files (PDF, PPTX, DOCS)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () {
+                        // Simulate file selection
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'File picker integration required for production'),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: const Color(0xFFD5B8E0),
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 16),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.attach_file,
+                                color: Color(0xFFD5B8E0), size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Add Files',
+                              style: TextStyle(
+                                color: Color(0xFFD5B8E0),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (files.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ...files.map((file) => Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.description,
+                                    size: 16,
+                                    color: Color(0xFFD5B8E0)),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    file,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (subjectController.text.isNotEmpty &&
+                          topicController.text.isNotEmpty) {
+                        setState(() {
+                          notes.add(
+                            Note(
+                              subject: subjectController.text,
+                              topic: topicController.text,
+                              files: files,
+                              dateCreated: DateTime.now(),
+                            ),
+                          );
+                        });
+                        _saveNotes();
+                        Navigator.pop(context);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD5B8E0),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _editNote(BuildContext context, int index) {
+    final TextEditingController subjectController =
+        TextEditingController(text: notes[index].subject);
+    final TextEditingController topicController =
+        TextEditingController(text: notes[index].topic);
+    List<String> files = List.from(notes[index].files);
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFFFAF8FF),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Edit Note',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3F3F3F),
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: subjectController,
+                decoration: InputDecoration(
+                  hintText: 'Subject',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: topicController,
+                decoration: InputDecoration(
+                  hintText: 'Topic',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(
+                    color: Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Files (PDF, PPTX, DOCS)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'File picker integration required'),
+                              ),
+                            );
+                          },
+                          child: const Icon(Icons.add,
+                              color: Color(0xFFD5B8E0), size: 20),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (files.isEmpty)
+                      Text(
+                        'No files added',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                      )
+                    else
+                      ...files.asMap().entries.map((entry) {
+                        int fileIndex = entry.key;
+                        String file = entry.value;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.description,
+                                  size: 16,
+                                  color: Color(0xFFD5B8E0)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  file,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    files.removeAt(fileIndex);
+                                  });
+                                },
+                                child: const Icon(Icons.close,
+                                    size: 16, color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (subjectController.text.isNotEmpty &&
+                          topicController.text.isNotEmpty) {
+                        setState(() {
+                          notes[index].subject = subjectController.text;
+                          notes[index].topic = topicController.text;
+                          notes[index].files = files;
+                        });
+                        _saveNotes();
+                        Navigator.pop(context);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD5B8E0),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class NoteCard extends StatelessWidget {
+  final Note note;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const NoteCard({
+    Key? key,
+    required this.note,
+    required this.onEdit,
+    required this.onDelete,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      note.subject,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF3F3F3F),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      note.topic,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton(
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    onTap: onEdit,
+                    child: const Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    onTap: onDelete,
+                    child: const Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (note.files.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              children: [
+                ...note.files.map((file) {
+                  String extension = file.split('.').last.toUpperCase();
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3E8FF),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.description,
+                            size: 12, color: Color(0xFFD5B8E0)),
+                        const SizedBox(width: 4),
+                        Text(
+                          extension,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFD5B8E0),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class Note {
+  String subject;
+  String topic;
+  List<String> files;
+  DateTime dateCreated;
+
+  Note({
+    required this.subject,
+    required this.topic,
+    required this.files,
+    required this.dateCreated,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'subject': subject,
+      'topic': topic,
+      'files': files,
+      'dateCreated': dateCreated.toIso8601String(),
+    };
+  }
+
+  factory Note.fromJson(Map<String, dynamic> json) {
+    return Note(
+      subject: json['subject'] ?? '',
+      topic: json['topic'] ?? '',
+      files: List<String>.from(json['files'] ?? []),
+      dateCreated: json['dateCreated'] != null
+          ? DateTime.parse(json['dateCreated'])
+          : DateTime.now(),
     );
   }
 }
