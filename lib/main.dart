@@ -148,9 +148,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadExams() async {
     final prefs = await SharedPreferences.getInstance();
-    final examsJson = prefs.getStringList('exams') ?? [];
+    final assignmentsJson = prefs.getStringList('assignments') ?? [];
+    final assignments = assignmentsJson
+        .map((json) => Assignment.fromJson(jsonDecode(json)))
+        .toList();
+
+    // Filter assignments where name contains "exam" (case-insensitive) and haven't passed
+    final examAssignments = assignments
+        .where((a) => a.name.toLowerCase().contains('exam'))
+        .where((a) {
+      final daysRemaining = _getDaysRemaining(a.dueDate);
+      return daysRemaining >= 0; // Only show if exam day hasn't passed
+    })
+        .map((a) => Exam(
+              title: a.name,
+              description: a.subject,
+              date: a.dueDate,
+              status: a.status == 'Completed' ? 'Completed' : 'Incoming',
+              icon: '📚',
+            ))
+        .toList();
+
     setState(() {
-      _exams = examsJson.map((json) => Exam.fromJson(jsonDecode(json))).toList();
+      _exams = examAssignments;
     });
   }
 
@@ -787,11 +807,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
-                          'Opening Google Calendar in browser...'),
+                          'Opening reminders...'),
                     ),
                   );
-                  // For web: use html.window.open()
-                  // For mobile: consider using native implementation
                 },
                 child: _buildQuickLinkCard(
                   icon: Icons.notifications,
@@ -1391,6 +1409,11 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Filter assignments - exclude exam assignments
+    final nonExamAssignments = assignments
+        .where((a) => !a.name.toLowerCase().contains('exam'))
+        .toList();
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAF8FF),
       appBar: AppBar(
@@ -1414,14 +1437,14 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${assignments.length} assignments',
+                '${nonExamAssignments.length} assignments',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey.shade600,
                 ),
               ),
               const SizedBox(height: 20),
-              if (assignments.isEmpty)
+              if (nonExamAssignments.isEmpty)
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -1446,7 +1469,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                   ),
                 )
               else
-                ...assignments.asMap().entries.map((entry) {
+                ...nonExamAssignments.asMap().entries.map((entry) {
                   int index = entry.key;
                   Assignment assignment = entry.value;
                   return Padding(
@@ -1456,7 +1479,8 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                       onEdit: () => _editAssignment(context, index),
                       onDelete: () {
                         setState(() {
-                          assignments.removeAt(index);
+                          assignments.removeWhere(
+                              (a) => a.name == assignment.name && a.subject == assignment.subject);
                         });
                         _saveAssignments();
                       },
@@ -1495,193 +1519,436 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Assignment'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                hintText: 'Assignment name',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFFFAF8FF),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Add New Assignment',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3F3F3F),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: subjectController,
-              decoration: InputDecoration(
-                hintText: 'Subject',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: dueDateController,
-              readOnly: true,
-              decoration: InputDecoration(
-                hintText: 'Due Date (MM/DD/YYYY)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                suffixIcon: const Icon(Icons.calendar_today),
-              ),
-              onTap: () async {
-                final DateTime? picked = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime(2100),
-                );
-                if (picked != null) {
-                  dueDateController.text =
-                      '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButton<String>(
-              value: status,
-              isExpanded: true,
-              items: ['Not started yet', 'In Progress', 'Completed']
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                  .toList(),
-              onChanged: (value) {
-                status = value ?? 'Not started yet';
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty &&
-                  subjectController.text.isNotEmpty &&
-                  dueDateController.text.isNotEmpty) {
-                setState(() {
-                  assignments.add(
-                    Assignment(
-                      name: nameController.text,
-                      subject: subjectController.text,
-                      dueDate: dueDateController.text,
-                      status: status,
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  hintText: 'Assignment name',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
                     ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: subjectController,
+                decoration: InputDecoration(
+                  hintText: 'Subject',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: dueDateController,
+                readOnly: true,
+                decoration: InputDecoration(
+                  hintText: 'Due Date (MM/DD/YYYY)',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
+                  suffixIcon: const Icon(Icons.calendar_today,
+                      color: Color(0xFFD5B8E0)),
+                ),
+                onTap: () async {
+                  final DateTime? picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2100),
                   );
-                });
-                _saveAssignments();
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Add'),
+                  if (picked != null) {
+                    dueDateController.text =
+                        '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                ),
+                child: DropdownButton<String>(
+                  value: status,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: ['Not started yet', 'In Progress', 'Completed']
+                      .map((s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(
+                              s,
+                              style: const TextStyle(
+                                color: Color(0xFF3F3F3F),
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    status = value ?? 'Not started yet';
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (nameController.text.isNotEmpty &&
+                          subjectController.text.isNotEmpty &&
+                          dueDateController.text.isNotEmpty) {
+                        setState(() {
+                          assignments.add(
+                            Assignment(
+                              name: nameController.text,
+                              subject: subjectController.text,
+                              dueDate: dueDateController.text,
+                              status: status,
+                            ),
+                          );
+                        });
+                        _saveAssignments();
+                        Navigator.pop(context);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD5B8E0),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   void _editAssignment(BuildContext context, int index) {
+    // Find the actual assignment in the full list
+    final assignmentToEdit = assignments.firstWhere(
+      (a) =>
+          a.name ==
+          assignments
+              .where((x) => !x.name.toLowerCase().contains('exam'))
+              .toList()[index]
+              .name,
+    );
+
     final TextEditingController nameController =
-        TextEditingController(text: assignments[index].name);
+        TextEditingController(text: assignmentToEdit.name);
     final TextEditingController subjectController =
-        TextEditingController(text: assignments[index].subject);
+        TextEditingController(text: assignmentToEdit.subject);
     final TextEditingController dueDateController =
-        TextEditingController(text: assignments[index].dueDate);
-    String status = assignments[index].status;
+        TextEditingController(text: assignmentToEdit.dueDate);
+    String status = assignmentToEdit.status;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Assignment'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                hintText: 'Assignment name',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFFFAF8FF),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Edit Assignment',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3F3F3F),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: subjectController,
-              decoration: InputDecoration(
-                hintText: 'Subject',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  hintText: 'Assignment name',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: dueDateController,
-              readOnly: true,
-              decoration: InputDecoration(
-                hintText: 'Due Date (MM/DD/YYYY)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 12),
+              TextField(
+                controller: subjectController,
+                decoration: InputDecoration(
+                  hintText: 'Subject',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
                 ),
-                suffixIcon: const Icon(Icons.calendar_today),
               ),
-              onTap: () async {
-                final DateTime? picked = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime(2100),
-                );
-                if (picked != null) {
-                  dueDateController.text =
-                      '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButton<String>(
-              value: status,
-              isExpanded: true,
-              items: ['Not started yet', 'In Progress', 'Completed']
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                  .toList(),
-              onChanged: (value) {
-                status = value ?? 'Not started yet';
-              },
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: dueDateController,
+                readOnly: true,
+                decoration: InputDecoration(
+                  hintText: 'Due Date (MM/DD/YYYY)',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD5B8E0),
+                      width: 2,
+                    ),
+                  ),
+                  suffixIcon: const Icon(Icons.calendar_today,
+                      color: Color(0xFFD5B8E0)),
+                ),
+                onTap: () async {
+                  final DateTime? picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    dueDateController.text =
+                        '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                ),
+                child: DropdownButton<String>(
+                  value: status,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: ['Not started yet', 'In Progress', 'Completed']
+                      .map((s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(
+                              s,
+                              style: const TextStyle(
+                                color: Color(0xFF3F3F3F),
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    status = value ?? 'Not started yet';
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (nameController.text.isNotEmpty &&
+                          subjectController.text.isNotEmpty &&
+                          dueDateController.text.isNotEmpty) {
+                        setState(() {
+                          final idx = assignments.indexOf(assignmentToEdit);
+                          if (idx != -1) {
+                            assignments[idx].name = nameController.text;
+                            assignments[idx].subject = subjectController.text;
+                            assignments[idx].dueDate = dueDateController.text;
+                            assignments[idx].status = status;
+                          }
+                        });
+                        _saveAssignments();
+                        Navigator.pop(context);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD5B8E0),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty &&
-                  subjectController.text.isNotEmpty &&
-                  dueDateController.text.isNotEmpty) {
-                setState(() {
-                  assignments[index].name = nameController.text;
-                  assignments[index].subject = subjectController.text;
-                  assignments[index].dueDate = dueDateController.text;
-                  assignments[index].status = status;
-                });
-                _saveAssignments();
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }
