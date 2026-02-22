@@ -210,6 +210,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return 0;
   }
 
+  String _getDaysRemainingText(int days) {
+    if (days == 0) {
+      return 'Today';
+    } else if (days == 1) {
+      return 'Tomorrow';
+    } else if (days < 0) {
+      return 'Overdue';
+    } else if (days <= 7) {
+      return '$days days left';
+    } else if (days <= 30) {
+      final weeks = (days / 7).floor();
+      return '$weeks week${weeks > 1 ? 's' : ''} left';
+    } else {
+      final months = (days / 30).floor();
+      return '$months month${months > 1 ? 's' : ''} left';
+    }
+  }
+
   void _editExam(BuildContext context, int index) {
     final TextEditingController nameController =
         TextEditingController(text: _exams[index].name);
@@ -686,7 +704,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildExamCard(ExamAssignment exam, int index) {
     final daysRemaining = _getDaysRemaining(exam.dueDate);
+    final daysText = _getDaysRemainingText(daysRemaining);
     final isCompleted = exam.status == 'Completed';
+
+    Color getDaysColor() {
+      if (daysRemaining < 0) return const Color(0xFFDC2626);
+      if (daysRemaining <= 3) return const Color(0xFFF59E0B);
+      return const Color(0xFF0369A1);
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -747,12 +772,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  exam.dueDate,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade500,
-                    fontWeight: FontWeight.w400,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: getDaysColor().withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    daysText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: getDaysColor(),
+                    ),
                   ),
                 ),
               ],
@@ -1155,105 +1190,168 @@ class _TaskScreenState extends State<TaskScreen> {
   void _addTask(BuildContext context) {
     final TextEditingController titleController = TextEditingController();
     final TextEditingController timeController = TextEditingController();
-    String priority = 'Medium';
+    String selectedPriority = 'Medium';
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: const Color(0xFFFAF8FF),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Add New Task',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3F3F3F),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: titleController,
-                decoration: InputDecoration(
-                  hintText: 'Task title',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          backgroundColor: const Color(0xFFFAF8FF),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Add New Task',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3F3F3F),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: timeController,
-                decoration: InputDecoration(
-                  hintText: 'Time (HH:MM)',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.white,
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: DropdownButton<String>(
-                  value: priority,
-                  isExpanded: true,
-                  underline: const SizedBox(),
-                  items: ['Low', 'Medium', 'High']
-                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                      .toList(),
-                  onChanged: (value) {
-                    priority = value ?? 'Medium';
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (titleController.text.isNotEmpty &&
-                          timeController.text.isNotEmpty) {
-                        setState(() {
-                          tasks.add(
-                            Task(
-                              title: titleController.text,
-                              time: timeController.text,
-                              isCompleted: false,
-                              priority: priority,
-                            ),
-                          );
-                        });
-                        _saveTasks();
-                        Navigator.pop(context);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD5B8E0),
-                      foregroundColor: Colors.white,
+                const SizedBox(height: 20),
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    hintText: 'Task title',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                    child: const Text('Add'),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
+                    ),
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: timeController,
+                  decoration: InputDecoration(
+                    hintText: 'Time (HH:MM)',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: DropdownButton<String>(
+                    value: selectedPriority,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    items: ['Low', 'Medium', 'High']
+                        .map((p) => DropdownMenuItem(
+                              value: p,
+                              child: Text(
+                                p,
+                                style: const TextStyle(
+                                  color: Color(0xFF3F3F3F),
+                                ),
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedPriority = value ?? 'Medium';
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (titleController.text.isNotEmpty &&
+                            timeController.text.isNotEmpty) {
+                          this.setState(() {
+                            tasks.add(
+                              Task(
+                                title: titleController.text,
+                                time: timeController.text,
+                                isCompleted: false,
+                                priority: selectedPriority,
+                              ),
+                            );
+                          });
+                          _saveTasks();
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD5B8E0),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1265,100 +1363,163 @@ class _TaskScreenState extends State<TaskScreen> {
         TextEditingController(text: tasks[index].title);
     final TextEditingController timeController =
         TextEditingController(text: tasks[index].time);
-    String priority = tasks[index].priority;
+    String selectedPriority = tasks[index].priority;
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: const Color(0xFFFAF8FF),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Edit Task',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3F3F3F),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: titleController,
-                decoration: InputDecoration(
-                  hintText: 'Task title',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          backgroundColor: const Color(0xFFFAF8FF),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Edit Task',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3F3F3F),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: timeController,
-                decoration: InputDecoration(
-                  hintText: 'Time (HH:MM)',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.white,
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: DropdownButton<String>(
-                  value: priority,
-                  isExpanded: true,
-                  underline: const SizedBox(),
-                  items: ['Low', 'Medium', 'High']
-                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                      .toList(),
-                  onChanged: (value) {
-                    priority = value ?? 'Medium';
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (titleController.text.isNotEmpty &&
-                          timeController.text.isNotEmpty) {
-                        setState(() {
-                          tasks[index].title = titleController.text;
-                          tasks[index].time = timeController.text;
-                          tasks[index].priority = priority;
-                        });
-                        _saveTasks();
-                        Navigator.pop(context);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD5B8E0),
-                      foregroundColor: Colors.white,
+                const SizedBox(height: 20),
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    hintText: 'Task title',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                    child: const Text('Save'),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
+                    ),
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: timeController,
+                  decoration: InputDecoration(
+                    hintText: 'Time (HH:MM)',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: DropdownButton<String>(
+                    value: selectedPriority,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    items: ['Low', 'Medium', 'High']
+                        .map((p) => DropdownMenuItem(
+                              value: p,
+                              child: Text(
+                                p,
+                                style: const TextStyle(
+                                  color: Color(0xFF3F3F3F),
+                                ),
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedPriority = value ?? 'Medium';
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (titleController.text.isNotEmpty &&
+                            timeController.text.isNotEmpty) {
+                          this.setState(() {
+                            tasks[index].title = titleController.text;
+                            tasks[index].time = timeController.text;
+                            tasks[index].priority = selectedPriority;
+                          });
+                          _saveTasks();
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD5B8E0),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1724,222 +1885,226 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController subjectController = TextEditingController();
     final TextEditingController dueDateController = TextEditingController();
-    String status = 'Not started yet';
+    String selectedStatus = 'Not started yet';
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: const Color(0xFFFAF8FF),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Add New Assignment',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3F3F3F),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  hintText: 'Assignment name',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
-                    ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          backgroundColor: const Color(0xFFFAF8FF),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Add New Assignment',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3F3F3F),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: subjectController,
-                decoration: InputDecoration(
-                  hintText: 'Subject',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    hintText: 'Assignment name',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: dueDateController,
-                readOnly: true,
-                decoration: InputDecoration(
-                  hintText: 'Due Date (MM/DD/YYYY)',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                const SizedBox(height: 12),
+                TextField(
+                  controller: subjectController,
+                  decoration: InputDecoration(
+                    hintText: 'Subject',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
                     ),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
-                    ),
-                  ),
-                  suffixIcon: const Icon(Icons.calendar_today,
-                      color: Color(0xFFD5B8E0)),
                 ),
-                onTap: () async {
-                  final DateTime? picked = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    dueDateController.text =
-                        '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Colors.grey.shade300,
-                    width: 1.5,
+                const SizedBox(height: 12),
+                TextField(
+                  controller: dueDateController,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: 'Due Date (MM/DD/YYYY)',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
+                    ),
+                    suffixIcon: const Icon(Icons.calendar_today,
+                        color: Color(0xFFD5B8E0)),
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white,
-                ),
-                child: DropdownButton<String>(
-                  value: status,
-                  isExpanded: true,
-                  underline: const SizedBox(),
-                  items: ['Not started yet', 'In Progress', 'Completed']
-                      .map((s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(
-                              s,
-                              style: const TextStyle(
-                                color: Color(0xFF3F3F3F),
-                              ),
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    status = value ?? 'Not started yet';
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      dueDateController.text =
+                          '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                    }
                   },
                 ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
                     ),
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
                   ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (nameController.text.isNotEmpty &&
-                          subjectController.text.isNotEmpty &&
-                          dueDateController.text.isNotEmpty) {
-                        setState(() {
-                          bool isExam = nameController.text.toLowerCase().contains('exam');
-                          assignments.add(
-                            Assignment(
-                              name: nameController.text,
-                              subject: subjectController.text,
-                              dueDate: dueDateController.text,
-                              status: status,
-                              isExam: isExam,
-                            ),
-                          );
-
-                          if (isExam) {
-                            _addExamToList(
-                              nameController.text,
-                              subjectController.text,
-                              dueDateController.text,
-                              status,
-                            );
-                          }
-                        });
-                        _saveAssignments();
-                        Navigator.pop(context);
-                      }
+                  child: DropdownButton<String>(
+                    value: selectedStatus,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    items: ['Not started yet', 'In Progress', 'Completed']
+                        .map((s) => DropdownMenuItem(
+                              value: s,
+                              child: Text(
+                                s,
+                                style: const TextStyle(
+                                  color: Color(0xFF3F3F3F),
+                                ),
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedStatus = value ?? 'Not started yet';
+                      });
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD5B8E0),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                    child: const Text('Add'),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (nameController.text.isNotEmpty &&
+                            subjectController.text.isNotEmpty &&
+                            dueDateController.text.isNotEmpty) {
+                          this.setState(() {
+                            bool isExam = nameController.text.toLowerCase().contains('exam');
+                            assignments.add(
+                              Assignment(
+                                name: nameController.text,
+                                subject: subjectController.text,
+                                dueDate: dueDateController.text,
+                                status: selectedStatus,
+                                isExam: isExam,
+                              ),
+                            );
+
+                            if (isExam) {
+                              _addExamToList(
+                                nameController.text,
+                                subjectController.text,
+                                dueDateController.text,
+                                selectedStatus,
+                              );
+                            }
+                          });
+                          _saveAssignments();
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD5B8E0),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1974,210 +2139,214 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         TextEditingController(text: assignmentToEdit.subject);
     final TextEditingController dueDateController =
         TextEditingController(text: assignmentToEdit.dueDate);
-    String status = assignmentToEdit.status;
+    String selectedStatus = assignmentToEdit.status;
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: const Color(0xFFFAF8FF),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Edit Assignment',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3F3F3F),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  hintText: 'Assignment name',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
-                    ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          backgroundColor: const Color(0xFFFAF8FF),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Edit Assignment',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3F3F3F),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: subjectController,
-                decoration: InputDecoration(
-                  hintText: 'Subject',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    hintText: 'Assignment name',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: dueDateController,
-                readOnly: true,
-                decoration: InputDecoration(
-                  hintText: 'Due Date (MM/DD/YYYY)',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                const SizedBox(height: 12),
+                TextField(
+                  controller: subjectController,
+                  decoration: InputDecoration(
+                    hintText: 'Subject',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
                     ),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
-                    ),
-                  ),
-                  suffixIcon: const Icon(Icons.calendar_today,
-                      color: Color(0xFFD5B8E0)),
                 ),
-                onTap: () async {
-                  final DateTime? picked = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    dueDateController.text =
-                        '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Colors.grey.shade300,
-                    width: 1.5,
+                const SizedBox(height: 12),
+                TextField(
+                  controller: dueDateController,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: 'Due Date (MM/DD/YYYY)',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
+                    ),
+                    suffixIcon: const Icon(Icons.calendar_today,
+                        color: Color(0xFFD5B8E0)),
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white,
-                ),
-                child: DropdownButton<String>(
-                  value: status,
-                  isExpanded: true,
-                  underline: const SizedBox(),
-                  items: ['Not started yet', 'In Progress', 'Completed']
-                      .map((s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(
-                              s,
-                              style: const TextStyle(
-                                color: Color(0xFF3F3F3F),
-                              ),
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    status = value ?? 'Not started yet';
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      dueDateController.text =
+                          '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                    }
                   },
                 ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
                     ),
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
                   ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (nameController.text.isNotEmpty &&
-                          subjectController.text.isNotEmpty &&
-                          dueDateController.text.isNotEmpty) {
-                        setState(() {
-                          final idx = assignments.indexOf(assignmentToEdit);
-                          if (idx != -1) {
-                            assignments[idx].name = nameController.text;
-                            assignments[idx].subject = subjectController.text;
-                            assignments[idx].dueDate = dueDateController.text;
-                            assignments[idx].status = status;
-                          }
-                        });
-                        _saveAssignments();
-                        Navigator.pop(context);
-                      }
+                  child: DropdownButton<String>(
+                    value: selectedStatus,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    items: ['Not started yet', 'In Progress', 'Completed']
+                        .map((s) => DropdownMenuItem(
+                              value: s,
+                              child: Text(
+                                s,
+                                style: const TextStyle(
+                                  color: Color(0xFF3F3F3F),
+                                ),
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedStatus = value ?? 'Not started yet';
+                      });
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD5B8E0),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (nameController.text.isNotEmpty &&
+                            subjectController.text.isNotEmpty &&
+                            dueDateController.text.isNotEmpty) {
+                          this.setState(() {
+                            final idx = assignments.indexOf(assignmentToEdit);
+                            if (idx != -1) {
+                              assignments[idx].name = nameController.text;
+                              assignments[idx].subject = subjectController.text;
+                              assignments[idx].dueDate = dueDateController.text;
+                              assignments[idx].status = selectedStatus;
+                            }
+                          });
+                          _saveAssignments();
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD5B8E0),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2501,229 +2670,231 @@ class _NotesScreenState extends State<NotesScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: const Color(0xFFFAF8FF),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Add New Note',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3F3F3F),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: subjectController,
-                decoration: InputDecoration(
-                  hintText: 'Subject',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
-                    ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          backgroundColor: const Color(0xFFFAF8FF),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Add New Note',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3F3F3F),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: topicController,
-                decoration: InputDecoration(
-                  hintText: 'Topic',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                const SizedBox(height: 20),
+                TextField(
+                  controller: subjectController,
+                  decoration: InputDecoration(
+                    hintText: 'Subject',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(
-                    color: Colors.grey.shade300,
-                    width: 1.5,
+                const SizedBox(height: 12),
+                TextField(
+                  controller: topicController,
+                  decoration: InputDecoration(
+                    hintText: 'Topic',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Files (PDF, PPTX, DOCS)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () async {
+                              try {
+                                FilePickerResult? result = await FilePicker.platform
+                                    .pickFiles(
+                                  type: FileType.custom,
+                                  allowedExtensions: ['pdf', 'pptx', 'docx', 'doc'],
+                                  allowMultiple: true,
+                                );
+
+                                if (result != null) {
+                                  setState(() {
+                                    for (var file in result.files) {
+                                      files.add(file.name);
+                                    }
+                                  });
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error picking file: $e'),
+                                  ),
+                                );
+                              }
+                            },
+                            child: const Icon(Icons.add,
+                                color: Color(0xFFD5B8E0), size: 20),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (files.isEmpty)
                         Text(
-                          'Files (PDF, PPTX, DOCS)',
+                          'No files added',
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
+                            color: Colors.grey.shade500,
                           ),
-                        ),
-                        GestureDetector(
-                          onTap: () async {
-                            try {
-                              FilePickerResult? result = await FilePicker.platform
-                                  .pickFiles(
-                                type: FileType.custom,
-                                allowedExtensions: ['pdf', 'pptx', 'docx', 'doc'],
-                                allowMultiple: true,
-                              );
-
-                              if (result != null) {
-                                setState(() {
-                                  for (var file in result.files) {
-                                    files.add(file.name);
-                                  }
-                                });
-                              }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error picking file: $e'),
+                        )
+                      else
+                        ...files.asMap().entries.map((entry) {
+                          int fileIndex = entry.key;
+                          String file = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.description,
+                                    size: 16,
+                                    color: Color(0xFFD5B8E0)),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    file,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
                                 ),
-                              );
-                            }
-                          },
-                          child: const Icon(Icons.add,
-                              color: Color(0xFFD5B8E0), size: 20),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (files.isEmpty)
-                      Text(
-                        'No files added',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                        ),
-                      )
-                    else
-                      ...files.asMap().entries.map((entry) {
-                        int fileIndex = entry.key;
-                        String file = entry.value;
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.description,
-                                  size: 16,
-                                  color: Color(0xFFD5B8E0)),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  file,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12),
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      files.removeAt(fileIndex);
+                                    });
+                                  },
+                                  child: const Icon(Icons.close,
+                                      size: 16, color: Colors.red),
                                 ),
-                              ),
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    files.removeAt(fileIndex);
-                                  });
-                                },
-                                child: const Icon(Icons.close,
-                                    size: 16, color: Colors.red),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (subjectController.text.isNotEmpty &&
-                          topicController.text.isNotEmpty) {
-                        setState(() {
-                          notes.add(
-                            Note(
-                              subject: subjectController.text,
-                              topic: topicController.text,
-                              files: files,
-                              dateCreated: DateTime.now(),
+                              ],
                             ),
                           );
-                        });
-                        _saveNotes();
-                        Navigator.pop(context);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD5B8E0),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        }).toList(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                    child: const Text('Add'),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (subjectController.text.isNotEmpty &&
+                            topicController.text.isNotEmpty) {
+                          this.setState(() {
+                            notes.add(
+                              Note(
+                                subject: subjectController.text,
+                                topic: topicController.text,
+                                files: files,
+                                dateCreated: DateTime.now(),
+                              ),
+                            );
+                          });
+                          _saveNotes();
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD5B8E0),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2739,226 +2910,228 @@ class _NotesScreenState extends State<NotesScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: const Color(0xFFFAF8FF),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Edit Note',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3F3F3F),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: subjectController,
-                decoration: InputDecoration(
-                  hintText: 'Subject',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
-                    ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          backgroundColor: const Color(0xFFFAF8FF),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Edit Note',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3F3F3F),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: topicController,
-                decoration: InputDecoration(
-                  hintText: 'Topic',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                const SizedBox(height: 20),
+                TextField(
+                  controller: subjectController,
+                  decoration: InputDecoration(
+                    hintText: 'Subject',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1.5,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD5B8E0),
-                      width: 2,
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(
-                    color: Colors.grey.shade300,
-                    width: 1.5,
+                const SizedBox(height: 12),
+                TextField(
+                  controller: topicController,
+                  decoration: InputDecoration(
+                    hintText: 'Topic',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD5B8E0),
+                        width: 2,
+                      ),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Files (PDF, PPTX, DOCS)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () async {
+                              try {
+                                FilePickerResult? result = await FilePicker.platform
+                                    .pickFiles(
+                                  type: FileType.custom,
+                                  allowedExtensions: ['pdf', 'pptx', 'docx', 'doc'],
+                                  allowMultiple: true,
+                                );
+
+                                if (result != null) {
+                                  setState(() {
+                                    for (var file in result.files) {
+                                      if (!files.contains(file.name)) {
+                                        files.add(file.name);
+                                      }
+                                    }
+                                  });
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error picking file: $e'),
+                                  ),
+                                );
+                              }
+                            },
+                            child: const Icon(Icons.add,
+                                color: Color(0xFFD5B8E0), size: 20),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (files.isEmpty)
                         Text(
-                          'Files (PDF, PPTX, DOCS)',
+                          'No files added',
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
+                            color: Colors.grey.shade500,
                           ),
-                        ),
-                        GestureDetector(
-                          onTap: () async {
-                            try {
-                              FilePickerResult? result = await FilePicker.platform
-                                  .pickFiles(
-                                type: FileType.custom,
-                                allowedExtensions: ['pdf', 'pptx', 'docx', 'doc'],
-                                allowMultiple: true,
-                              );
-
-                              if (result != null) {
-                                setState(() {
-                                  for (var file in result.files) {
-                                    if (!files.contains(file.name)) {
-                                      files.add(file.name);
-                                    }
-                                  }
-                                });
-                              }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error picking file: $e'),
+                        )
+                      else
+                        ...files.asMap().entries.map((entry) {
+                          int fileIndex = entry.key;
+                          String file = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.description,
+                                    size: 16,
+                                    color: Color(0xFFD5B8E0)),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    file,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
                                 ),
-                              );
-                            }
-                          },
-                          child: const Icon(Icons.add,
-                              color: Color(0xFFD5B8E0), size: 20),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (files.isEmpty)
-                      Text(
-                        'No files added',
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      files.removeAt(fileIndex);
+                                    });
+                                  },
+                                  child: const Icon(Icons.close,
+                                      size: 16, color: Colors.red),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancel',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: Color(0xFF6B7280),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
-                      )
-                    else
-                      ...files.asMap().entries.map((entry) {
-                        int fileIndex = entry.key;
-                        String file = entry.value;
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.description,
-                                  size: 16,
-                                  color: Color(0xFFD5B8E0)),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  file,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    files.removeAt(fileIndex);
-                                  });
-                                },
-                                child: const Icon(Icons.close,
-                                    size: 16, color: Colors.red),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (subjectController.text.isNotEmpty &&
+                            topicController.text.isNotEmpty) {
+                          this.setState(() {
+                            notes[index].subject = subjectController.text;
+                            notes[index].topic = topicController.text;
+                            notes[index].files = files;
+                          });
+                          _saveNotes();
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD5B8E0),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Save'),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (subjectController.text.isNotEmpty &&
-                          topicController.text.isNotEmpty) {
-                        setState(() {
-                          notes[index].subject = subjectController.text;
-                          notes[index].topic = topicController.text;
-                          notes[index].files = files;
-                        });
-                        _saveNotes();
-                        Navigator.pop(context);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD5B8E0),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
