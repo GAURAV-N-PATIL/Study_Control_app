@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 void main() {
   runApp(const StudyControlApp());
@@ -12,9 +14,11 @@ class StudyControlApp extends StatelessWidget {
     return MaterialApp(
       title: 'Study Control',
       theme: ThemeData(
-        primaryColor: const Color(0xFF6C5CE7),
-        scaffoldBackgroundColor: const Color(0xFFF8F9FA),
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6366F1),
+          brightness: Brightness.light,
+        ),
       ),
       debugShowCheckedModeBanner: false,
       home: const MainScreen(),
@@ -35,7 +39,6 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
-    const HabitScreen(),
     const TaskScreen(),
     const AssignmentsScreen(),
   ];
@@ -48,7 +51,8 @@ class _MainScreenState extends State<MainScreen> {
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF6C5CE7),
+        elevation: 8,
+        selectedItemColor: const Color(0xFF6366F1),
         unselectedItemColor: Colors.grey.shade400,
         onTap: (index) {
           setState(() {
@@ -57,19 +61,15 @@ class _MainScreenState extends State<MainScreen> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+            icon: Icon(Icons.home_rounded),
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: 'Habit',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.check_circle),
+            icon: Icon(Icons.check_circle_rounded),
             label: 'Task',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.assignment),
+            icon: Icon(Icons.assignment_rounded),
             label: 'Assignment',
           ),
         ],
@@ -78,7 +78,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// Dashboard Screen
+// Dashboard Screen - Completely Redesigned
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
 
@@ -87,455 +87,109 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              const Text(
-                'MY MENTAL HEALTH',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D3436),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '✨ tracking sheet ✨',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.purple.shade400,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 24),
+  double _taskProgress = 0.0;
+  int _completedTasks = 0;
+  int _totalTasks = 0;
 
-              // Affirmation Card
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFDCC9FF), Color(0xFFE0C3FF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Today\'s Affirmation',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3436),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'I am worthy and deserving of love and kindness, including from myself.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.indigo.shade900,
-                        fontStyle: FontStyle.italic,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Progress Bars Section
-              Row(
-                children: [
-                  Expanded(
-                    child: CircularProgressCard(
-                      title: 'Habit Progress',
-                      progress: 0.75,
-                      color: Colors.green.shade400,
-                      icon: Icons.favorite,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: CircularProgressCard(
-                      title: 'Daily Tasks',
-                      progress: 0.55,
-                      color: Colors.blue.shade400,
-                      icon: Icons.check_circle,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Quick Stats
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Quick Stats',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3436),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    StatRow(
-                      label: 'Hours of Sleep',
-                      value: '7-9',
-                      icon: Icons.bedtime,
-                    ),
-                    const SizedBox(height: 12),
-                    StatRow(
-                      label: 'Water Balance',
-                      value: '8/8 cups',
-                      icon: Icons.local_drink,
-                    ),
-                    const SizedBox(height: 12),
-                    StatRow(
-                      label: 'Productivity',
-                      value: '★★★★☆',
-                      icon: Icons.star,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Mood Tracker
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'My Mood Today',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3436),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        MoodButton(color: const Color(0xFFFF6B6B), label: '😢'),
-                        MoodButton(color: const Color(0xFFFFA94D), label: '😐'),
-                        MoodButton(color: const Color(0xFFFFD93D), label: '😊'),
-                        MoodButton(color: const Color(0xFF6BCB77), label: '😄'),
-                        MoodButton(color: const Color(0xFF4D96FF), label: '🤩'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Circular Progress Card Widget
-class CircularProgressCard extends StatelessWidget {
-  final String title;
-  final double progress;
-  final Color color;
-  final IconData icon;
-
-  const CircularProgressCard({
-    Key? key,
-    required this.title,
-    required this.progress,
-    required this.color,
-    required this.icon,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          SizedBox(
-            width: 100,
-            height: 100,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox(
-                  width: 100,
-                  height: 100,
-                  child: CircularProgressIndicator(
-                    value: progress,
-                    strokeWidth: 6,
-                    backgroundColor: Colors.grey.shade200,
-                    valueColor: AlwaysStoppedAnimation<Color>(color),
-                  ),
-                ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, color: color, size: 32),
-                    Text(
-                      '${(progress * 100).toStringAsFixed(0)}%',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF2D3436),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Stat Row Widget
-class StatRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-
-  const StatRow({
-    Key? key,
-    required this.label,
-    required this.value,
-    required this.icon,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: const Color(0xFF6C5CE7), size: 20),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF636E72),
-              ),
-            ),
-          ],
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF2D3436),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Mood Button Widget
-class MoodButton extends StatefulWidget {
-  final Color color;
-  final String label;
-
-  const MoodButton({
-    Key? key,
-    required this.color,
-    required this.label,
-  }) : super(key: key);
-
-  @override
-  State<MoodButton> createState() => _MoodButtonState();
-}
-
-class _MoodButtonState extends State<MoodButton> {
-  bool _isSelected = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _isSelected = !_isSelected;
-        });
-      },
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: widget.color.withOpacity(_isSelected ? 1 : 0.3),
-          shape: BoxShape.circle,
-          border: _isSelected
-              ? Border.all(
-                  color: widget.color,
-                  width: 2,
-                )
-              : null,
-        ),
-        child: Center(
-          child: Text(widget.label, style: const TextStyle(fontSize: 24)),
-        ),
-      ),
-    );
-  }
-}
-
-// Habit Model
-class Habit {
-  String name;
-  Color color;
-  Set<String> completedDays;
-
-  Habit({
-    required this.name,
-    required this.color,
-    required this.completedDays,
-  });
-}
-
-// Habit Screen
-class HabitScreen extends StatefulWidget {
-  const HabitScreen({Key? key}) : super(key: key);
-
-  @override
-  State<HabitScreen> createState() => _HabitScreenState();
-}
-
-class _HabitScreenState extends State<HabitScreen> {
-  List<Habit> habits = [
-    Habit(
-      name: 'Morning Meditation',
-      color: const Color(0xFF6C5CE7),
-      completedDays: {'M', 'T', 'W', 'F'},
+  final List<ExamData> upcomingExams = [
+    ExamData(
+      title: 'QUIZ 1',
+      description: 'Containing syllabus of week 1 to 4',
+      date: 'March 15, 2026',
+      status: 'Completed',
+      icon: '📝',
     ),
-    Habit(
-      name: 'Drink Water',
-      color: const Color(0xFF00B894),
-      completedDays: {'M', 'T', 'W', 'T'},
+    ExamData(
+      title: 'QUIZ 2',
+      description: 'Containing syllabus of week 5 to 8',
+      date: 'November 23, 2025',
+      status: 'Completed',
+      icon: '✍️',
     ),
-    Habit(
-      name: 'Exercise',
-      color: const Color(0xFFFF7675),
-      completedDays: {'M', 'W', 'F'},
+    ExamData(
+      title: 'END TERM',
+      description: 'Containing syllabus of week 1 to 12',
+      date: 'December 21, 2025',
+      status: 'Incoming',
+      icon: '📚',
     ),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadTaskProgress();
+  }
+
+  Future<void> _loadTaskProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _completedTasks = prefs.getInt('completed_tasks') ?? 0;
+      _totalTasks = prefs.getInt('total_tasks') ?? 5;
+      _taskProgress = _totalTasks > 0 ? _completedTasks / _totalTasks : 0.0;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F7FF),
+      body: SafeArea(
+        child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'My Habits',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D3436),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${habits.length} habits tracked',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ...habits.asMap().entries.map((entry) {
-                int index = entry.key;
-                Habit habit = entry.value;
-                return Column(
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    HabitCard(
-                      habit: habit,
-                      onEdit: () => _editHabit(context, index),
-                      onDelete: () => _deleteHabit(index),
+                    Text(
+                      'Dashboard',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1F2937),
+                            fontSize: 32,
+                          ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Track your learning journey',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey.shade600,
+                            fontSize: 14,
+                          ),
+                    ),
                   ],
-                );
-              }).toList(),
-              ElevatedButton.icon(
-                onPressed: () => _addHabit(context),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Habit'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C5CE7),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Task Progress Card
+                    _buildTaskProgressCard(),
+                    const SizedBox(height: 24),
+
+                    // Today's Tasks Section
+                    _buildTodayTasksSection(),
+                    const SizedBox(height: 24),
+
+                    // Upcoming Exams Section
+                    _buildUpcomingExamsSection(),
+                    const SizedBox(height: 24),
+
+                    // Assignments Overview
+                    _buildAssignmentsOverviewSection(),
+                    const SizedBox(height: 24),
+
+                    // Quick Links
+                    _buildQuickLinksSection(),
+                    const SizedBox(height: 20),
+                  ],
                 ),
               ),
             ],
@@ -545,249 +199,507 @@ class _HabitScreenState extends State<HabitScreen> {
     );
   }
 
-  void _addHabit(BuildContext context) {
-    final TextEditingController nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Habit'),
-        content: TextField(
-          controller: nameController,
-          decoration: InputDecoration(
-            hintText: 'Habit name',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                setState(() {
-                  habits.add(
-                    Habit(
-                      name: nameController.text,
-                      color: Color(0xFF6C5CE7 + (habits.length * 100000)),
-                      completedDays: {},
-                    ),
-                  );
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _editHabit(BuildContext context, int index) {
-    final TextEditingController nameController =
-        TextEditingController(text: habits[index].name);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Habit'),
-        content: TextField(
-          controller: nameController,
-          decoration: InputDecoration(
-            hintText: 'Habit name',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                setState(() {
-                  habits[index].name = nameController.text;
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _deleteHabit(int index) {
-    setState(() {
-      habits.removeAt(index);
-    });
-  }
-}
-
-// Habit Card Widget
-class HabitCard extends StatelessWidget {
-  final Habit habit;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const HabitCard({
-    Key? key,
-    required this.habit,
-    required this.onEdit,
-    required this.onDelete,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildTaskProgressCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF6366F1).withOpacity(0.1),
+            const Color(0xFF8B5CF6).withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF6366F1).withOpacity(0.2),
+          width: 1.5,
+        ),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  habit.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D3436),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Daily Progress',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1F2937),
+                        ),
                   ),
-                ),
-              ),
-              PopupMenuButton(
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    onTap: onEdit,
-                    child: const Row(
-                      children: [
-                        Icon(Icons.edit, size: 20),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    onTap: onDelete,
-                    child: const Row(
-                      children: [
-                        Icon(Icons.delete, size: 20, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$_completedTasks of $_totalTasks tasks',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
                   ),
                 ],
               ),
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF6366F1).withOpacity(0.2),
+                      const Color(0xFF8B5CF6).withOpacity(0.1),
+                    ],
+                  ),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 70,
+                      height: 70,
+                      child: CircularProgressIndicator(
+                        value: _taskProgress,
+                        strokeWidth: 5,
+                        backgroundColor: Colors.grey.shade200,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Color(0xFF6366F1),
+                        ),
+                      ),
+                    ),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${(_taskProgress * 100).toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                        const Text(
+                          'Done',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-                .map(
-                  (day) => DayCircle(
-                    day: day,
-                    isCompleted: habit.completedDays.contains(day),
-                  ),
-                )
-                .toList(),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: LinearProgressIndicator(
+              value: _taskProgress,
+              minHeight: 10,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFF6366F1),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-// Day Circle Widget
-class DayCircle extends StatefulWidget {
-  final String day;
-  final bool isCompleted;
-
-  const DayCircle({
-    Key? key,
-    required this.day,
-    required this.isCompleted,
-  }) : super(key: key);
-
-  @override
-  State<DayCircle> createState() => _DayCircleState();
-}
-
-class _DayCircleState extends State<DayCircle> {
-  late bool completed;
-
-  @override
-  void initState() {
-    super.initState();
-    completed = widget.isCompleted;
+  Widget _buildTodayTasksSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Today\'s Tasks',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1F2937),
+              ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _buildTaskItem('Morning Routine', '08:00 AM', true),
+              const Divider(height: 16),
+              _buildTaskItem('Review Mathematics', '10:30 AM', false),
+              const Divider(height: 16),
+              _buildTaskItem('Study Assignment', '02:00 PM', false),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          completed = !completed;
-        });
-      },
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: completed ? Colors.green.shade400 : Colors.grey.shade200,
-          shape: BoxShape.circle,
+  Widget _buildTaskItem(String title, String time, bool completed) {
+    return Row(
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: completed
+                ? const Color(0xFF10B981)
+                : Colors.grey.shade200,
+            border: Border.all(
+              color: completed
+                  ? const Color(0xFF10B981)
+                  : Colors.grey.shade300,
+              width: 2,
+            ),
+          ),
+          child: completed
+              ? const Icon(
+                  Icons.check,
+                  size: 14,
+                  color: Colors.white,
+                )
+              : null,
         ),
-        child: Center(
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1F2937),
+                  decoration: completed
+                      ? TextDecoration.lineThrough
+                      : TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                time,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: completed
+                ? const Color(0xFF10B981).withOpacity(0.1)
+                : const Color(0xFFF59E0B).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
           child: Text(
-            widget.day,
+            completed ? 'Done' : 'Pending',
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: completed ? Colors.white : Colors.grey.shade600,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: completed
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFFF59E0B),
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildUpcomingExamsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Upcoming Exams',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1F2937),
+              ),
+        ),
+        const SizedBox(height: 12),
+        ...upcomingExams.map((exam) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildExamCard(exam),
+            )),
+      ],
+    );
+  }
+
+  Widget _buildExamCard(ExamData exam) {
+    final isCompleted = exam.status == 'Completed';
+    final isIncoming = exam.status == 'Incoming';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isCompleted
+              ? const Color(0xFF10B981).withOpacity(0.2)
+              : const Color(0xFFF59E0B).withOpacity(0.2),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isCompleted
+                  ? const Color(0xFF10B981).withOpacity(0.1)
+                  : const Color(0xFFF59E0B).withOpacity(0.1),
+            ),
+            child: Center(
+              child: Text(exam.icon, style: const TextStyle(fontSize: 24)),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exam.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  exam.description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  exam.date,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isCompleted
+                  ? const Color(0xFF10B981).withOpacity(0.15)
+                  : const Color(0xFFF59E0B).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              exam.status,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: isCompleted
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFF59E0B),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-// Task Model
-class Task {
-  String title;
-  String time;
-  bool isCompleted;
-  String priority;
+  Widget _buildAssignmentsOverviewSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Assignments Overview',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1F2937),
+              ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildAssignmentStat('Total', '4', Colors.blue),
+              _buildAssignmentStat('Pending', '4', Colors.orange),
+              _buildAssignmentStat('Completed', '0', Colors.green),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
-  Task({
-    required this.title,
-    required this.time,
-    required this.isCompleted,
-    required this.priority,
-  });
+  Widget _buildAssignmentStat(String label, String count, Color color) {
+    return Column(
+      children: [
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withOpacity(0.15),
+          ),
+          child: Center(
+            child: Text(
+              count,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickLinksSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Links',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1F2937),
+              ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickLinkCard(
+                icon: Icons.assignment,
+                label: 'Assignments',
+                color: const Color(0xFF3B82F6),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickLinkCard(
+                icon: Icons.check_circle,
+                label: 'Tasks',
+                color: const Color(0xFF10B981),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickLinkCard(
+                icon: Icons.notifications,
+                label: 'Reminders',
+                color: const Color(0xFF8B5CF6),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickLinkCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withOpacity(0.15),
+            color.withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF1F2937),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // Task Screen
@@ -821,23 +733,60 @@ class _TaskScreenState extends State<TaskScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tasksJson = prefs.getStringList('tasks') ?? [];
+    if (tasksJson.isNotEmpty) {
+      setState(() {
+        tasks = tasksJson
+            .map((json) => Task.fromJson(jsonDecode(json)))
+            .toList();
+      });
+    }
+    _updateTaskProgress();
+  }
+
+  Future<void> _saveTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tasksJson =
+        tasks.map((task) => jsonEncode(task.toJson())).toList();
+    await prefs.setStringList('tasks', tasksJson);
+    _updateTaskProgress();
+  }
+
+  void _updateTaskProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completedCount = tasks.where((t) => t.isCompleted).length;
+    await prefs.setInt('completed_tasks', completedCount);
+    await prefs.setInt('total_tasks', tasks.length);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F7FF),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: const Text('Tasks'),
+        centerTitle: false,
+        titleTextStyle: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1F2937),
+              fontSize: 28,
+            ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Today\'s Tasks',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D3436),
-                ),
-              ),
-              const SizedBox(height: 8),
               Text(
                 '${tasks.where((t) => !t.isCompleted).length} tasks pending',
                 style: TextStyle(
@@ -845,32 +794,44 @@ class _TaskScreenState extends State<TaskScreen> {
                   color: Colors.grey.shade600,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               ...tasks.asMap().entries.map((entry) {
                 int index = entry.key;
                 Task task = entry.value;
-                return Column(
-                  children: [
-                    TaskCard(
-                      task: task,
-                      onToggle: () => _toggleTask(index),
-                      onEdit: () => _editTask(context, index),
-                      onDelete: () => _deleteTask(index),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TaskCard(
+                    task: task,
+                    onToggle: () {
+                      setState(() {
+                        tasks[index].isCompleted = !tasks[index].isCompleted;
+                      });
+                      _saveTasks();
+                    },
+                    onEdit: () => _editTask(context, index),
+                    onDelete: () {
+                      setState(() {
+                        tasks.removeAt(index);
+                      });
+                      _saveTasks();
+                    },
+                  ),
                 );
               }).toList(),
-              ElevatedButton.icon(
-                onPressed: () => _addTask(context),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Task'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C5CE7),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _addTask(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Task'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
@@ -879,12 +840,6 @@ class _TaskScreenState extends State<TaskScreen> {
         ),
       ),
     );
-  }
-
-  void _toggleTask(int index) {
-    setState(() {
-      tasks[index].isCompleted = !tasks[index].isCompleted;
-    });
   }
 
   void _addTask(BuildContext context) {
@@ -919,8 +874,9 @@ class _TaskScreenState extends State<TaskScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            DropdownButton(
+            DropdownButton<String>(
               value: priority,
+              isExpanded: true,
               items: ['Low', 'Medium', 'High']
                   .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                   .toList(),
@@ -949,6 +905,7 @@ class _TaskScreenState extends State<TaskScreen> {
                     ),
                   );
                 });
+                _saveTasks();
                 Navigator.pop(context);
               }
             },
@@ -993,8 +950,9 @@ class _TaskScreenState extends State<TaskScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            DropdownButton(
+            DropdownButton<String>(
               value: priority,
+              isExpanded: true,
               items: ['Low', 'Medium', 'High']
                   .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                   .toList(),
@@ -1018,6 +976,7 @@ class _TaskScreenState extends State<TaskScreen> {
                   tasks[index].time = timeController.text;
                   tasks[index].priority = priority;
                 });
+                _saveTasks();
                 Navigator.pop(context);
               }
             },
@@ -1026,12 +985,6 @@ class _TaskScreenState extends State<TaskScreen> {
         ],
       ),
     );
-  }
-
-  void _deleteTask(int index) {
-    setState(() {
-      tasks.removeAt(index);
-    });
   }
 }
 
@@ -1053,11 +1006,11 @@ class TaskCard extends StatelessWidget {
   Color _getPriorityColor(String priority) {
     switch (priority) {
       case 'High':
-        return const Color(0xFFFF7675);
+        return const Color(0xFFEF4444);
       case 'Medium':
-        return const Color(0xFFFFD93D);
+        return const Color(0xFFF59E0B);
       case 'Low':
-        return const Color(0xFF6BCB77);
+        return const Color(0xFF10B981);
       default:
         return Colors.grey;
     }
@@ -1069,15 +1022,19 @@ class TaskCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       child: Row(
         children: [
           GestureDetector(
@@ -1088,15 +1045,15 @@ class TaskCard extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border.all(
                   color: task.isCompleted
-                      ? Colors.green.shade400
+                      ? const Color(0xFF10B981)
                       : Colors.grey.shade300,
                   width: 2,
                 ),
                 shape: BoxShape.circle,
-                color: task.isCompleted ? Colors.green.shade400 : null,
+                color: task.isCompleted ? const Color(0xFF10B981) : null,
               ),
               child: task.isCompleted
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
                   : null,
             ),
           ),
@@ -1108,58 +1065,49 @@ class TaskCard extends StatelessWidget {
                 Text(
                   task.title,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF2D3436),
+                    color: const Color(0xFF1F2937),
                     decoration: task.isCompleted
                         ? TextDecoration.lineThrough
                         : TextDecoration.none,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.access_time, size: 14, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      task.time,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getPriorityColor(task.priority)
-                            .withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        task.priority,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: _getPriorityColor(task.priority),
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  task.time,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _getPriorityColor(task.priority).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              task.priority[0],
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: _getPriorityColor(task.priority),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           PopupMenuButton(
             itemBuilder: (context) => [
               PopupMenuItem(
                 onTap: onEdit,
                 child: const Row(
                   children: [
-                    Icon(Icons.edit, size: 20),
+                    Icon(Icons.edit, size: 18),
                     SizedBox(width: 8),
                     Text('Edit'),
                   ],
@@ -1169,7 +1117,7 @@ class TaskCard extends StatelessWidget {
                 onTap: onDelete,
                 child: const Row(
                   children: [
-                    Icon(Icons.delete, size: 20, color: Colors.red),
+                    Icon(Icons.delete, size: 18, color: Colors.red),
                     SizedBox(width: 8),
                     Text('Delete', style: TextStyle(color: Colors.red)),
                   ],
@@ -1183,19 +1131,37 @@ class TaskCard extends StatelessWidget {
   }
 }
 
-// Assignment Model
-class Assignment {
-  String name;
-  String subject;
-  String dueDate;
-  String status;
+// Task Model
+class Task {
+  String title;
+  String time;
+  bool isCompleted;
+  String priority;
 
-  Assignment({
-    required this.name,
-    required this.subject,
-    required this.dueDate,
-    required this.status,
+  Task({
+    required this.title,
+    required this.time,
+    required this.isCompleted,
+    required this.priority,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'time': time,
+      'isCompleted': isCompleted,
+      'priority': priority,
+    };
+  }
+
+  factory Task.fromJson(Map<String, dynamic> json) {
+    return Task(
+      title: json['title'] ?? '',
+      time: json['time'] ?? '',
+      isCompleted: json['isCompleted'] ?? false,
+      priority: json['priority'] ?? 'Medium',
+    );
+  }
 }
 
 // Assignments Screen
@@ -1209,43 +1175,77 @@ class AssignmentsScreen extends StatefulWidget {
 class _AssignmentsScreenState extends State<AssignmentsScreen> {
   List<Assignment> assignments = [
     Assignment(
-      name: 'Math Assignment',
-      subject: 'Mathematics',
-      dueDate: '2024-03-15',
-      status: 'Pending',
+      name: 'for data science-2',
+      subject: 'Maths',
+      dueDate: 'December 3, 2025',
+      status: 'Not started yet',
     ),
     Assignment(
-      name: 'Essay on Literature',
+      name: 'for data science-2',
+      subject: 'Statistics',
+      dueDate: 'December 3, 2025',
+      status: 'Not started yet',
+    ),
+    Assignment(
+      name: 'for foundation',
+      subject: 'Computational Thinking',
+      dueDate: 'December 3, 2025',
+      status: 'Not started yet',
+    ),
+    Assignment(
+      name: 'for foundation-2',
       subject: 'English',
-      dueDate: '2024-03-10',
-      status: 'In Progress',
-    ),
-    Assignment(
-      name: 'Physics Lab Report',
-      subject: 'Physics',
-      dueDate: '2024-03-20',
-      status: 'Submitted',
+      dueDate: 'December 3, 2025',
+      status: 'Not started yet',
     ),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadAssignments();
+  }
+
+  Future<void> _loadAssignments() async {
+    final prefs = await SharedPreferences.getInstance();
+    final assignmentsJson = prefs.getStringList('assignments') ?? [];
+    if (assignmentsJson.isNotEmpty) {
+      setState(() {
+        assignments = assignmentsJson
+            .map((json) => Assignment.fromJson(jsonDecode(json)))
+            .toList();
+      });
+    }
+  }
+
+  Future<void> _saveAssignments() async {
+    final prefs = await SharedPreferences.getInstance();
+    final assignmentsJson =
+        assignments.map((a) => jsonEncode(a.toJson())).toList();
+    await prefs.setStringList('assignments', assignmentsJson);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F7FF),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: const Text('Assignments'),
+        centerTitle: false,
+        titleTextStyle: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1F2937),
+              fontSize: 28,
+            ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Assignments',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D3436),
-                ),
-              ),
-              const SizedBox(height: 8),
               Text(
                 '${assignments.length} assignments',
                 style: TextStyle(
@@ -1253,31 +1253,38 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                   color: Colors.grey.shade600,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               ...assignments.asMap().entries.map((entry) {
                 int index = entry.key;
                 Assignment assignment = entry.value;
-                return Column(
-                  children: [
-                    AssignmentCard(
-                      assignment: assignment,
-                      onEdit: () => _editAssignment(context, index),
-                      onDelete: () => _deleteAssignment(index),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AssignmentCard(
+                    assignment: assignment,
+                    onEdit: () => _editAssignment(context, index),
+                    onDelete: () {
+                      setState(() {
+                        assignments.removeAt(index);
+                      });
+                      _saveAssignments();
+                    },
+                  ),
                 );
               }).toList(),
-              ElevatedButton.icon(
-                onPressed: () => _addAssignment(context),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Assignment'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C5CE7),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _addAssignment(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Assignment'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
@@ -1292,7 +1299,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController subjectController = TextEditingController();
     final TextEditingController dueDateController = TextEditingController();
-    String status = 'Pending';
+    String status = 'Not started yet';
 
     showDialog(
       context: context,
@@ -1324,20 +1331,21 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
             TextField(
               controller: dueDateController,
               decoration: InputDecoration(
-                hintText: 'Due Date (YYYY-MM-DD)',
+                hintText: 'Due Date',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            DropdownButton(
+            DropdownButton<String>(
               value: status,
-              items: ['Pending', 'In Progress', 'Submitted']
+              isExpanded: true,
+              items: ['Not started yet', 'In Progress', 'Completed']
                   .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                   .toList(),
               onChanged: (value) {
-                status = value ?? 'Pending';
+                status = value ?? 'Not started yet';
               },
             ),
           ],
@@ -1362,6 +1370,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                     ),
                   );
                 });
+                _saveAssignments();
                 Navigator.pop(context);
               }
             },
@@ -1411,20 +1420,21 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
             TextField(
               controller: dueDateController,
               decoration: InputDecoration(
-                hintText: 'Due Date (YYYY-MM-DD)',
+                hintText: 'Due Date',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            DropdownButton(
+            DropdownButton<String>(
               value: status,
-              items: ['Pending', 'In Progress', 'Submitted']
+              isExpanded: true,
+              items: ['Not started yet', 'In Progress', 'Completed']
                   .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                   .toList(),
               onChanged: (value) {
-                status = value ?? 'Pending';
+                status = value ?? 'Not started yet';
               },
             ),
           ],
@@ -1445,6 +1455,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                   assignments[index].dueDate = dueDateController.text;
                   assignments[index].status = status;
                 });
+                _saveAssignments();
                 Navigator.pop(context);
               }
             },
@@ -1453,12 +1464,6 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         ],
       ),
     );
-  }
-
-  void _deleteAssignment(int index) {
-    setState(() {
-      assignments.removeAt(index);
-    });
   }
 }
 
@@ -1477,12 +1482,12 @@ class AssignmentCard extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'Pending':
-        return const Color(0xFFFFD93D);
+      case 'Not started yet':
+        return const Color(0xFFF59E0B);
       case 'In Progress':
-        return const Color(0xFF6C5CE7);
-      case 'Submitted':
-        return const Color(0xFF6BCB77);
+        return const Color(0xFF6366F1);
+      case 'Completed':
+        return const Color(0xFF10B981);
       default:
         return Colors.grey;
     }
@@ -1494,15 +1499,19 @@ class AssignmentCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1516,9 +1525,9 @@ class AssignmentCard extends StatelessWidget {
                     Text(
                       assignment.name,
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3436),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F2937),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1538,7 +1547,7 @@ class AssignmentCard extends StatelessWidget {
                     onTap: onEdit,
                     child: const Row(
                       children: [
-                        Icon(Icons.edit, size: 20),
+                        Icon(Icons.edit, size: 18),
                         SizedBox(width: 8),
                         Text('Edit'),
                       ],
@@ -1548,7 +1557,7 @@ class AssignmentCard extends StatelessWidget {
                     onTap: onDelete,
                     child: const Row(
                       children: [
-                        Icon(Icons.delete, size: 20, color: Colors.red),
+                        Icon(Icons.delete, size: 18, color: Colors.red),
                         SizedBox(width: 8),
                         Text('Delete', style: TextStyle(color: Colors.red)),
                       ],
@@ -1558,13 +1567,14 @@ class AssignmentCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                  Icon(Icons.calendar_today,
+                      size: 14, color: Colors.grey.shade600),
                   const SizedBox(width: 4),
                   Text(
                     assignment.dueDate,
@@ -1576,19 +1586,17 @@ class AssignmentCard extends StatelessWidget {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(assignment.status).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: _getStatusColor(assignment.status).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   assignment.status,
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
                     color: _getStatusColor(assignment.status),
                   ),
                 ),
@@ -1599,4 +1607,54 @@ class AssignmentCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// Assignment Model
+class Assignment {
+  String name;
+  String subject;
+  String dueDate;
+  String status;
+
+  Assignment({
+    required this.name,
+    required this.subject,
+    required this.dueDate,
+    required this.status,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'subject': subject,
+      'dueDate': dueDate,
+      'status': status,
+    };
+  }
+
+  factory Assignment.fromJson(Map<String, dynamic> json) {
+    return Assignment(
+      name: json['name'] ?? '',
+      subject: json['subject'] ?? '',
+      dueDate: json['dueDate'] ?? '',
+      status: json['status'] ?? 'Not started yet',
+    );
+  }
+}
+
+// Exam Data Model
+class ExamData {
+  final String title;
+  final String description;
+  final String date;
+  final String status;
+  final String icon;
+
+  ExamData({
+    required this.title,
+    required this.description,
+    required this.date,
+    required this.status,
+    required this.icon,
+  });
 }
