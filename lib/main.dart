@@ -1,83 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 void main() {
-  runApp(const StudyControlApp());
+  runApp(const MyApp());
 }
 
-class StudyControlApp extends StatelessWidget {
-  const StudyControlApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Study Control',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.purple,
-      ),
-      home: const MainNavigation(),
+      title: 'Daily Productivity App',
+      theme: ThemeData(primarySwatch: Colors.deepPurple),
+      home: const HomePage(),
     );
   }
 }
 
-class MainNavigation extends StatefulWidget {
-  const MainNavigation({super.key});
+//Home Page with Bottom Navigation
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  State<MainNavigation> createState() => _MainNavigationState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    Center(child: Text("Habits")),
-    Center(child: Text("Tasks")),
-    Center(child: Text("Subjects")),
+  final List<Widget> _screens = [
+    const DashboardScreen(),
+    const HabitsScreen(),
+    const TasksScreen(),
   ];
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onItemTapped,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.check_circle_outline),
-            selectedIcon: Icon(Icons.check_circle),
-            label: 'Habits',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.list_alt_outlined),
-            selectedIcon: Icon(Icons.list_alt),
-            label: 'Tasks',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book),
-            label: 'Subjects',
-          ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        selectedItemColor: Colors.deepPurple,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.checklist), label: 'Habits'),
+          BottomNavigationBarItem(icon: Icon(Icons.task), label: 'Tasks'),
         ],
       ),
     );
   }
 }
 
+//Dashboard Screen
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -86,43 +66,77 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // List of subjects + exam dates
   List<String> subjects = [];
   List<DateTime> examDates = [];
-
-  // Example habit/task progress (0.0–1.0)
-  double progress = 0.65;
+  List<Map<String, dynamic>> tasks = [];
+  List<Map<String, dynamic>> habits = [];
 
   @override
   void initState() {
     super.initState();
-    _loadExamData();
+    _loadAllData();
   }
 
-  // Load subjects & exams from SharedPreferences
-  Future<void> _loadExamData() async {
+  Future<void> _loadAllData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      subjects = prefs.getStringList('subjects') ?? ['Mathematics'];
-      List<String>? savedDates = prefs.getStringList('examDates');
-      if (savedDates != null) {
-        examDates =
-            savedDates.map((s) => DateTime.fromMillisecondsSinceEpoch(int.parse(s))).toList();
-      } else {
-        examDates = [DateTime.now().add(const Duration(days: 5))];
+    // Exams
+    subjects = prefs.getStringList('subjects') ?? ['Mathematics'];
+    List<String>? savedDates = prefs.getStringList('examDates');
+    examDates = savedDates != null
+        ? savedDates.map((s) => DateTime.fromMillisecondsSinceEpoch(int.parse(s))).toList()
+        : [DateTime.now().add(const Duration(days: 5))];
+
+    // Habits
+    List<String>? habitTitles = prefs.getStringList('habitsTitles');
+    List<String>? habitStatus = prefs.getStringList('habitsStatus');
+    habits = [];
+    if (habitTitles != null && habitStatus != null) {
+      for (int i = 0; i < habitTitles.length; i++) {
+        habits.add({"title": habitTitles[i], "done": habitStatus[i] == "true"});
       }
-    });
+    } else {
+      habits = [
+        {"title": "Drink Water", "done": false},
+        {"title": "Read 20 min", "done": false},
+      ];
+    }
+
+    // Tasks
+    List<String>? taskTitles = prefs.getStringList('tasksTitles');
+    List<String>? taskStatus = prefs.getStringList('tasksStatus');
+    tasks = [];
+    if (taskTitles != null && taskStatus != null) {
+      for (int i = 0; i < taskTitles.length; i++) {
+        tasks.add({"title": taskTitles[i], "done": taskStatus[i] == "true"});
+      }
+    }
+
+    setState(() {});
   }
 
-  // Save subjects & exams
-  Future<void> _saveExamData() async {
+  Future<void> _saveExams() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('subjects', subjects);
     await prefs.setStringList(
         'examDates', examDates.map((d) => d.millisecondsSinceEpoch.toString()).toList());
   }
 
-  // Popup dialog to edit a subject
+  Future<void> _saveHabits() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+        'habitsTitles', habits.map((h) => h['title'] as String).toList());
+    await prefs.setStringList(
+        'habitsStatus', habits.map((h) => (h['done'] as bool).toString()).toList());
+  }
+
+  Future<void> _saveTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('tasksTitles', tasks.map((t) => t['title'] as String).toList());
+    await prefs.setStringList(
+        'tasksStatus', tasks.map((t) => (t['done'] as bool).toString()).toList());
+  }
+
+  //Exam Edit Dialog
   Future<void> _editExamDialog(int index) async {
     TextEditingController subjectController =
         TextEditingController(text: subjects[index]);
@@ -145,42 +159,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   children: [
                     const Text("Exam Date: "),
-                    Text(
-                      "${tempDate.day}/${tempDate.month}/${tempDate.year}",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                    Text("${tempDate.day}/${tempDate.month}/${tempDate.year}",
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                     const Spacer(),
                     TextButton(
-                      onPressed: () async {
-                        DateTime? picked = await showDatePicker(
-                          context: context,
-                          initialDate: tempDate,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          setDialogState(() {
-                            tempDate = picked;
-                          });
-                        }
-                      },
-                      child: const Text("Change"),
-                    ),
+                        onPressed: () async {
+                          DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: tempDate,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime(2100));
+                          if (picked != null) {
+                            setDialogState(() => tempDate = picked);
+                          }
+                        },
+                        child: const Text("Change")),
                   ],
-                ),
+                )
               ],
             ),
             actions: [
               TextButton(
-                onPressed: () {
-                  subjects[index] = subjectController.text;
-                  examDates[index] = tempDate;
-                  _saveExamData();
-                  setState(() {});
-                  Navigator.pop(context);
-                },
-                child: const Text("Save"),
-              ),
+                  onPressed: () {
+                    subjects[index] = subjectController.text;
+                    examDates[index] = tempDate;
+                    _saveExams();
+                    setState(() {});
+                    Navigator.pop(context);
+                  },
+                  child: const Text("Save"))
             ],
           );
         });
@@ -188,22 +195,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Add new subject
-  void _addNewExam() {
-    setState(() {
-      subjects.add("New Subject");
-      examDates.add(DateTime.now().add(const Duration(days: 7)));
-    });
-    _saveExamData();
+  //Exam Card Color
+  Color _examCardColor(int daysLeft) {
+    if (daysLeft <= 1) return Colors.redAccent.withOpacity(0.4);
+    if (daysLeft <= 3) return Colors.orangeAccent.withOpacity(0.3);
+    return Colors.white.withOpacity(0.15);
   }
 
   @override
   Widget build(BuildContext context) {
+    int completedHabits = habits.where((h) => h['done'] as bool).length;
+    int completedTasks = tasks.where((t) => t['done'] as bool).length;
+    double habitProgress = habits.isEmpty ? 0 : completedHabits / habits.length;
+    double taskProgress = tasks.isEmpty ? 0 : completedTasks / tasks.length;
+    double overallProgress = (habitProgress + taskProgress) / 2;
+
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addNewExam,
-        child: const Icon(Icons.add),
-      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -218,39 +225,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: ListView(
               children: [
                 const SizedBox(height: 20),
-                const Text(
-                  "Dashboard",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                const Text("Dashboard",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 30),
 
-                // Circular Progress Card
-                _progressCard(progress),
+                // Circular Progress
+                _progressCard(overallProgress),
 
                 const SizedBox(height: 20),
 
-                // Assignments Card (dummy example)
-                _infoCard(title: "Assignments", content: "3 Active • 1 Overdue"),
+                // Assignments Card (example, dynamic later)
+                _infoCard(
+                    title: "Assignments",
+                    content:
+                        "${tasks.where((t) => !(t['done'] as bool)).length} Active • ${tasks.where((t) => t['done'] as bool).length} Done"),
 
                 const SizedBox(height: 20),
-
-                const Text(
-                  "Upcoming Tests",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                const Text("Upcoming Tests",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 15),
 
-                // List of subjects / exam cards
+                // Exams List
                 ...List.generate(subjects.length, (index) {
-                  int daysLeft = examDates[index].difference(DateTime.now()).inDays;
+                  int daysLeft =
+                      examDates[index].difference(DateTime.now()).inDays;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 15),
                     child: GestureDetector(
@@ -264,46 +268,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          setState(() {
+            subjects.add("New Subject");
+            examDates.add(DateTime.now().add(const Duration(days: 7)));
+            _saveExams();
+          });
+        },
+        child: const Icon(Icons.add),
+      ),
     );
   }
 
-  // Exam card widget
+  //Widgets
   Widget _examCard(String subjectName, int daysLeft) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(25),
-      ),
+          color: _examCardColor(daysLeft),
+          borderRadius: BorderRadius.circular(25)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Upcoming Test",
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
+          const Text("Upcoming Test",
+              style: TextStyle(color: Colors.white70, fontSize: 14)),
           const SizedBox(height: 8),
-          Text(
-            "$subjectName • $daysLeft days left",
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text("$subjectName • $daysLeft days left",
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  // Circular progress card
   Widget _progressCard(double progress) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(25),
-      ),
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(25)),
       child: Row(
         children: [
           SizedBox(
@@ -318,36 +324,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   backgroundColor: Colors.white24,
                   valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
-                Text(
-                  "${(progress * 100).toInt()}%",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text("${(progress * 100).toInt()}%",
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold))
               ],
             ),
           ),
           const SizedBox(width: 20),
           const Expanded(
-            child: Text(
-              "Today's Overall Progress\n(Habits + Tasks)",
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-          ),
+              child: Text("Today's Overall Progress\n(Habits + Tasks)",
+                  style: TextStyle(color: Colors.white, fontSize: 16))),
         ],
       ),
     );
   }
 
-  // Info card for assignments or other summary
   Widget _infoCard({required String title, required String content}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(25),
-      ),
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(25)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -355,8 +352,198 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 6),
           Text(content,
               style: const TextStyle(
-                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold)),
         ],
+      ),
+    );
+  }
+}
+
+//Habits Screen
+class HabitsScreen extends StatefulWidget {
+  const HabitsScreen({super.key});
+
+  @override
+  State<HabitsScreen> createState() => _HabitsScreenState();
+}
+
+class _HabitsScreenState extends State<HabitsScreen> {
+  List<Map<String, dynamic>> habits = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHabits();
+  }
+
+  Future<void> _loadHabits() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String>? titles = prefs.getStringList('habitsTitles');
+    List<String>? status = prefs.getStringList('habitsStatus');
+    habits = [];
+    if (titles != null && status != null) {
+      for (int i = 0; i < titles.length; i++) {
+        habits.add({"title": titles[i], "done": status[i] == "true"});
+      }
+    } else {
+      habits = [
+        {"title": "Drink Water", "done": false},
+        {"title": "Read 20 min", "done": false},
+      ];
+    }
+    setState(() {});
+  }
+
+  Future<void> _saveHabits() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('habitsTitles', habits.map((h) => h['title'] as String).toList());
+    await prefs.setStringList(
+        'habitsStatus', habits.map((h) => (h['done'] as bool).toString()).toList());
+  }
+
+  void _addHabit() {
+    setState(() {
+      habits.add({"title": "New Habit", "done": false});
+    });
+    _saveHabits();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF6A5AE0), Color(0xFF8E7BFF), Color(0xFF5F9CFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: ListView(
+              children: [
+                const SizedBox(height: 20),
+                const Text("Habits",
+                    style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                ...List.generate(habits.length, (index) {
+                  return Card(
+                    color: Colors.white.withOpacity(0.15),
+                    child: ListTile(
+                      title: Text(habits[index]['title'],
+                          style: const TextStyle(color: Colors.white)),
+                      trailing: Checkbox(
+                        value: habits[index]['done'],
+                        onChanged: (value) {
+                          setState(() => habits[index]['done'] = value);
+                          _saveHabits();
+                        },
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addHabit,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+//Tasks Screen
+class TasksScreen extends StatefulWidget {
+  const TasksScreen({super.key});
+
+  @override
+  State<TasksScreen> createState() => _TasksScreenState();
+}
+
+class _TasksScreenState extends State<TasksScreen> {
+  List<Map<String, dynamic>> tasks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String>? titles = prefs.getStringList('tasksTitles');
+    List<String>? status = prefs.getStringList('tasksStatus');
+    tasks = [];
+    if (titles != null && status != null) {
+      for (int i = 0; i < titles.length; i++) {
+        tasks.add({"title": titles[i], "done": status[i] == "true"});
+      }
+    }
+    setState(() {});
+  }
+
+  Future<void> _saveTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('tasksTitles', tasks.map((t) => t['title'] as String).toList());
+    await prefs.setStringList('tasksStatus', tasks.map((t) => (t['done'] as bool).toString()).toList());
+  }
+
+  void _addTask() {
+    setState(() => tasks.add({"title": "New Task", "done": false}));
+    _saveTasks();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF6A5AE0), Color(0xFF8E7BFF), Color(0xFF5F9CFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: ListView(
+              children: [
+                const SizedBox(height: 20),
+                const Text("Tasks",
+                    style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                ...List.generate(tasks.length, (index) {
+                  return Card(
+                    color: Colors.white.withOpacity(0.15),
+                    child: ListTile(
+                      title: Text(tasks[index]['title'],
+                          style: const TextStyle(color: Colors.white)),
+                      trailing: Checkbox(
+                        value: tasks[index]['done'],
+                        onChanged: (value) {
+                          setState(() => tasks[index]['done'] = value);
+                          _saveTasks();
+                        },
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addTask,
+        child: const Icon(Icons.add),
       ),
     );
   }
