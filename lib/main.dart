@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 void main() {
   runApp(const StudyControlApp());
@@ -256,11 +255,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        MoodButton(color: Color(0xFFFF6B6B), label: '😢'),
-                        MoodButton(color: Color(0xFFFFA94D), label: '😐'),
-                        MoodButton(color: Color(0xFFFFD93D), label: '😊'),
-                        MoodButton(color: Color(0xFF6BCB77), label: '😄'),
-                        MoodButton(color: Color(0xFF4D96FF), label: '🤩'),
+                        MoodButton(color: const Color(0xFFFF6B6B), label: '😢'),
+                        MoodButton(color: const Color(0xFFFFA94D), label: '😐'),
+                        MoodButton(color: const Color(0xFFFFD93D), label: '😊'),
+                        MoodButton(color: const Color(0xFF6BCB77), label: '😄'),
+                        MoodButton(color: const Color(0xFF4D96FF), label: '🤩'),
                       ],
                     ),
                   ],
@@ -374,7 +373,7 @@ class StatRow extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, color: Color(0xFF6C5CE7), size: 20),
+            Icon(icon, color: const Color(0xFF6C5CE7), size: 20),
             const SizedBox(width: 12),
             Text(
               label,
@@ -444,6 +443,19 @@ class _MoodButtonState extends State<MoodButton> {
       ),
     );
   }
+}
+
+// Habit Model
+class Habit {
+  String name;
+  Color color;
+  Set<String> completedDays;
+
+  Habit({
+    required this.name,
+    required this.color,
+    required this.completedDays,
+  });
 }
 
 // Habit Screen
@@ -763,16 +775,18 @@ class _DayCircleState extends State<DayCircle> {
   }
 }
 
-// Habit Model
-class Habit {
-  String name;
-  Color color;
-  Set<String> completedDays;
+// Task Model
+class Task {
+  String title;
+  String time;
+  bool isCompleted;
+  String priority;
 
-  Habit({
-    required this.name,
-    required this.color,
-    required this.completedDays,
+  Task({
+    required this.title,
+    required this.time,
+    required this.isCompleted,
+    required this.priority,
   });
 }
 
@@ -1169,18 +1183,18 @@ class TaskCard extends StatelessWidget {
   }
 }
 
-// Task Model
-class Task {
-  String title;
-  String time;
-  bool isCompleted;
-  String priority;
+// Assignment Model
+class Assignment {
+  String name;
+  String subject;
+  String dueDate;
+  String status;
 
-  Task({
-    required this.title,
-    required this.time,
-    required this.isCompleted,
-    required this.priority,
+  Assignment({
+    required this.name,
+    required this.subject,
+    required this.dueDate,
+    required this.status,
   });
 }
 
@@ -1195,19 +1209,19 @@ class AssignmentsScreen extends StatefulWidget {
 class _AssignmentsScreenState extends State<AssignmentsScreen> {
   List<Assignment> assignments = [
     Assignment(
-      title: 'Math Assignment',
+      name: 'Math Assignment',
       subject: 'Mathematics',
       dueDate: '2024-03-15',
       status: 'Pending',
     ),
     Assignment(
-      title: 'Essay on Literature',
+      name: 'Essay on Literature',
       subject: 'English',
       dueDate: '2024-03-10',
       status: 'In Progress',
     ),
     Assignment(
-      title: 'Physics Lab Report',
+      name: 'Physics Lab Report',
       subject: 'Physics',
       dueDate: '2024-03-20',
       status: 'Submitted',
@@ -1275,7 +1289,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   }
 
   void _addAssignment(BuildContext context) {
-    final TextEditingController titleController = TextEditingController();
+    final TextEditingController nameController = TextEditingController();
     final TextEditingController subjectController = TextEditingController();
     final TextEditingController dueDateController = TextEditingController();
     String status = 'Pending';
@@ -1288,9 +1302,9 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: titleController,
+              controller: nameController,
               decoration: InputDecoration(
-                hintText: 'Assignment title',
+                hintText: 'Assignment name',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1335,13 +1349,13 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
           ),
           TextButton(
             onPressed: () {
-              if (titleController.text.isNotEmpty &&
+              if (nameController.text.isNotEmpty &&
                   subjectController.text.isNotEmpty &&
                   dueDateController.text.isNotEmpty) {
                 setState(() {
                   assignments.add(
                     Assignment(
-                      title: titleController.text,
+                      name: nameController.text,
                       subject: subjectController.text,
                       dueDate: dueDateController.text,
                       status: status,
@@ -1359,8 +1373,8 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   }
 
   void _editAssignment(BuildContext context, int index) {
-    final TextEditingController titleController =
-        TextEditingController(text: assignments[index].title);
+    final TextEditingController nameController =
+        TextEditingController(text: assignments[index].name);
     final TextEditingController subjectController =
         TextEditingController(text: assignments[index].subject);
     final TextEditingController dueDateController =
@@ -1375,9 +1389,9 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: titleController,
+              controller: nameController,
               decoration: InputDecoration(
-                hintText: 'Assignment title',
+                hintText: 'Assignment name',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1422,11 +1436,11 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
           ),
           TextButton(
             onPressed: () {
-              if (titleController.text.isNotEmpty &&
+              if (nameController.text.isNotEmpty &&
                   subjectController.text.isNotEmpty &&
                   dueDateController.text.isNotEmpty) {
                 setState(() {
-                  assignments[index].title = titleController.text;
+                  assignments[index].name = nameController.text;
                   assignments[index].subject = subjectController.text;
                   assignments[index].dueDate = dueDateController.text;
                   assignments[index].status = status;
@@ -1500,7 +1514,7 @@ class AssignmentCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      assignment.title,
+                      assignment.name,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1585,19 +1599,4 @@ class AssignmentCard extends StatelessWidget {
       ),
     );
   }
-}
-
-// Assignment Model
-class Assignment {
-  String title;
-  String subject;
-  String dueDate;
-  String status;
-
-  Assignment({
-    required this.title,
-    required this.subject,``
-    required this.dueDate,
-    required this.status,
-  });
 }
