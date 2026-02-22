@@ -92,10 +92,125 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    int daysLeft = examDate.difference(DateTime.now()).inDays;
+
     return Scaffold(
-      body: Center(
-        child: Text("Dashboard Coming Next"),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF6A5AE0),
+              Color(0xFF8E7BFF),
+              Color(0xFF5F9CFF),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: ListView(
+              children: [
+
+                const SizedBox(height: 20),
+
+                const Text(
+                  "Dashboard",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                GestureDetector(
+                  onTap: _editExamDialog,
+                  child: _examCard(daysLeft),
+                ),
+
+              ],
+            ),
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _examCard(int daysLeft) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Upcoming Test",
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "$subjectName • $daysLeft days left",
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editExamDialog() async {
+    TextEditingController subjectController =
+        TextEditingController(text: subjectName);
+
+    DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: examDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        examDate = pickedDate;
+      });
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Edit Exam"),
+          content: TextField(
+            controller: subjectController,
+            decoration: const InputDecoration(
+              labelText: "Subject Name",
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  subjectName = subjectController.text;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text("Save"),
+            )
+          ],
+        );
+      },
     );
   }
 }
