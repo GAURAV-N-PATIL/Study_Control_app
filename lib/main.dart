@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 
 void main() {
   runApp(const StudyControlApp());
@@ -16,9 +18,10 @@ class StudyControlApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6366F1),
+          seedColor: const Color(0xFFE8D5F2),
           brightness: Brightness.light,
         ),
+        scaffoldBackgroundColor: const Color(0xFFFAF8FF),
       ),
       debugShowCheckedModeBanner: false,
       home: const MainScreen(),
@@ -37,11 +40,23 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const TaskScreen(),
-    const AssignmentsScreen(),
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      DashboardScreen(onTabChange: _onTabChange),
+      const TaskScreen(),
+      const AssignmentsScreen(),
+    ];
+  }
+
+  void _onTabChange(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,8 +67,8 @@ class _MainScreenState extends State<MainScreen> {
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
         elevation: 8,
-        selectedItemColor: const Color(0xFF6366F1),
-        unselectedItemColor: Colors.grey.shade400,
+        selectedItemColor: const Color(0xFF6B7280),
+        unselectedItemColor: const Color(0xFFC5B3D0),
         onTap: (index) {
           setState(() {
             _currentIndex = index;
@@ -80,7 +95,10 @@ class _MainScreenState extends State<MainScreen> {
 
 // Dashboard Screen - Completely Redesigned
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  final Function(int) onTabChange;
+
+  const DashboardScreen({Key? key, required this.onTabChange})
+      : super(key: key);
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -90,35 +108,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _taskProgress = 0.0;
   int _completedTasks = 0;
   int _totalTasks = 0;
-
-  final List<ExamData> upcomingExams = [
-    ExamData(
-      title: 'QUIZ 1',
-      description: 'Containing syllabus of week 1 to 4',
-      date: 'March 15, 2026',
-      status: 'Completed',
-      icon: '📝',
-    ),
-    ExamData(
-      title: 'QUIZ 2',
-      description: 'Containing syllabus of week 5 to 8',
-      date: 'November 23, 2025',
-      status: 'Completed',
-      icon: '✍️',
-    ),
-    ExamData(
-      title: 'END TERM',
-      description: 'Containing syllabus of week 1 to 12',
-      date: 'December 21, 2025',
-      status: 'Incoming',
-      icon: '📚',
-    ),
-  ];
+  List<Task> _highPriorityTasks = [];
+  List<Exam> _exams = [];
+  int _totalAssignments = 0;
+  int _completedAssignments = 0;
+  int _pendingAssignments = 0;
 
   @override
   void initState() {
     super.initState();
+    _loadAllData();
+  }
+
+  Future<void> _loadAllData() async {
+    await Future.delayed(const Duration(milliseconds: 100));
     _loadTaskProgress();
+    _loadHighPriorityTasks();
+    _loadExams();
+    _loadAssignmentStats();
   }
 
   Future<void> _loadTaskProgress() async {
@@ -130,10 +137,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  Future<void> _loadHighPriorityTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tasksJson = prefs.getStringList('tasks') ?? [];
+    final tasks = tasksJson
+        .map((json) => Task.fromJson(jsonDecode(json)))
+        .toList();
+
+    setState(() {
+      _highPriorityTasks =
+          tasks.where((t) => t.priority == 'High').take(3).toList();
+    });
+  }
+
+  Future<void> _loadExams() async {
+    final prefs = await SharedPreferences.getInstance();
+    final examsJson = prefs.getStringList('exams') ?? [];
+    setState(() {
+      _exams = examsJson.map((json) => Exam.fromJson(jsonDecode(json))).toList();
+    });
+  }
+
+  Future<void> _loadAssignmentStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    final assignmentsJson = prefs.getStringList('assignments') ?? [];
+    final assignments = assignmentsJson
+        .map((json) => Assignment.fromJson(jsonDecode(json)))
+        .toList();
+
+    setState(() {
+      _totalAssignments = assignments.length;
+      _completedAssignments =
+          assignments.where((a) => a.status == 'Completed').length;
+      _pendingAssignments = _totalAssignments - _completedAssignments;
+    });
+  }
+
+  int _getDaysRemaining(String dateString) {
+    try {
+      final date = DateFormat('MMMM d, yyyy').parse(dateString);
+      final now = DateTime.now();
+      return date.difference(now).inDays;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F7FF),
+      backgroundColor: const Color(0xFFFAF8FF),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -145,21 +198,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Dashboard',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1F2937),
-                            fontSize: 32,
-                          ),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w300,
+                        color: Color(0xFF3F3F3F),
+                        fontSize: 36,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Track your learning journey',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey.shade600,
-                            fontSize: 14,
-                          ),
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
                   ],
                 ),
@@ -202,19 +257,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTaskProgressCard() {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF6366F1).withOpacity(0.1),
-            const Color(0xFF8B5CF6).withOpacity(0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: const Color(0xFFE8D5F2),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFF6366F1).withOpacity(0.2),
+          color: const Color(0xFFD5B8E0).withOpacity(0.5),
           width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE8D5F2).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -226,20 +281,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Daily Progress',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1F2937),
-                        ),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFF3F3F3F),
+                      fontSize: 16,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '$_completedTasks of $_totalTasks tasks',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w400,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -248,12 +306,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF6366F1).withOpacity(0.2),
-                      const Color(0xFF8B5CF6).withOpacity(0.1),
-                    ],
-                  ),
+                  color: const Color(0xFFF3E8FF).withOpacity(0.6),
                 ),
                 child: Stack(
                   alignment: Alignment.center,
@@ -265,8 +318,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         value: _taskProgress,
                         strokeWidth: 5,
                         backgroundColor: Colors.grey.shade200,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF6366F1),
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(
+                          Color(0xFFD5B8E0),
                         ),
                       ),
                     ),
@@ -276,17 +330,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Text(
                           '${(_taskProgress * 100).toStringAsFixed(0)}%',
                           style: const TextStyle(
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             fontSize: 16,
-                            color: Color(0xFF1F2937),
+                            color: Color(0xFF3F3F3F),
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Done',
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.grey,
-                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
@@ -304,7 +358,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               minHeight: 10,
               backgroundColor: Colors.grey.shade200,
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF6366F1),
+                Color(0xFFD5B8E0),
               ),
             ),
           ),
@@ -317,12 +371,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Today\'s Tasks',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1F2937),
-              ),
+          style: TextStyle(
+            fontWeight: FontWeight.w400,
+            color: Color(0xFF3F3F3F),
+            fontSize: 18,
+            letterSpacing: 0.3,
+          ),
         ),
         const SizedBox(height: 12),
         Container(
@@ -338,21 +394,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _buildTaskItem('Morning Routine', '08:00 AM', true),
-              const Divider(height: 16),
-              _buildTaskItem('Review Mathematics', '10:30 AM', false),
-              const Divider(height: 16),
-              _buildTaskItem('Study Assignment', '02:00 PM', false),
-            ],
-          ),
+          child: _highPriorityTasks.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text(
+                      'No high priority tasks',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    ..._highPriorityTasks.asMap().entries.map((entry) {
+                      int index = entry.key;
+                      Task task = entry.value;
+                      return Column(
+                        children: [
+                          _buildTaskItem(task),
+                          if (index < _highPriorityTasks.length - 1)
+                            const Divider(height: 16),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
         ),
       ],
     );
   }
 
-  Widget _buildTaskItem(String title, String time, bool completed) {
+  Widget _buildTaskItem(Task task) {
     return Row(
       children: [
         Container(
@@ -360,17 +435,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           height: 24,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: completed
+            color: task.isCompleted
                 ? const Color(0xFF10B981)
-                : Colors.grey.shade200,
+                : const Color(0xFFE5E7EB),
             border: Border.all(
-              color: completed
+              color: task.isCompleted
                   ? const Color(0xFF10B981)
-                  : Colors.grey.shade300,
+                  : const Color(0xFFD1D5DB),
               width: 2,
             ),
           ),
-          child: completed
+          child: task.isCompleted
               ? const Icon(
                   Icons.check,
                   size: 14,
@@ -384,22 +459,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
+                task.title,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF1F2937),
-                  decoration: completed
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF3F3F3F),
+                  decoration: task.isCompleted
                       ? TextDecoration.lineThrough
                       : TextDecoration.none,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                time,
+                task.time,
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],
@@ -408,19 +484,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: completed
-                ? const Color(0xFF10B981).withOpacity(0.1)
-                : const Color(0xFFF59E0B).withOpacity(0.1),
+            color: task.isCompleted
+                ? const Color(0xFFD1FAE5)
+                : const Color(0xFFFEF3C7),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            completed ? 'Done' : 'Pending',
+            task.isCompleted ? 'Done' : 'Pending',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: completed
-                  ? const Color(0xFF10B981)
-                  : const Color(0xFFF59E0B),
+              color: task.isCompleted
+                  ? const Color(0xFF047857)
+                  : const Color(0xFFB45309),
             ),
           ),
         ),
@@ -432,116 +508,172 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Upcoming Exams',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1F2937),
-              ),
+          style: TextStyle(
+            fontWeight: FontWeight.w400,
+            color: Color(0xFF3F3F3F),
+            fontSize: 18,
+            letterSpacing: 0.3,
+          ),
         ),
         const SizedBox(height: 12),
-        ...upcomingExams.map((exam) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildExamCard(exam),
-            )),
+        if (_exams.isEmpty)
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F9FF),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFBAE6FD).withOpacity(0.5),
+                width: 1.5,
+              ),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Center(
+              child: Text(
+                'No exams scheduled',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          )
+        else
+          ..._exams.map((exam) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildExamCard(exam),
+              )).toList(),
       ],
     );
   }
 
-  Widget _buildExamCard(ExamData exam) {
+  Widget _buildExamCard(Exam exam) {
+    final daysRemaining = _getDaysRemaining(exam.date);
     final isCompleted = exam.status == 'Completed';
-    final isIncoming = exam.status == 'Incoming';
+    final isIncoming = exam.status == 'Incoming' && daysRemaining > 0;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCompleted
-              ? const Color(0xFF10B981).withOpacity(0.2)
-              : const Color(0xFFF59E0B).withOpacity(0.2),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
+    return GestureDetector(
+      onHover: (isHovering) {},
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F9FF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
               color: isCompleted
-                  ? const Color(0xFF10B981).withOpacity(0.1)
-                  : const Color(0xFFF59E0B).withOpacity(0.1),
+                  ? const Color(0xFFD1FAE5).withOpacity(0.5)
+                  : const Color(0xFFBAE6FD).withOpacity(0.5),
+              width: 1.5,
             ),
-            child: Center(
-              child: Text(exam.icon, style: const TextStyle(fontSize: 24)),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  exam.title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  exam.description,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  exam.date,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade500,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: isCompleted
-                  ? const Color(0xFF10B981).withOpacity(0.15)
-                  : const Color(0xFFF59E0B).withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              exam.status,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: isCompleted
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFFF59E0B),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-            ),
+            ],
           ),
-        ],
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isCompleted
+                      ? const Color(0xFFD1FAE5)
+                      : const Color(0xFFE0F2FE),
+                ),
+                child: Center(
+                  child: Text(exam.icon, style: const TextStyle(fontSize: 24)),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exam.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF3F3F3F),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      exam.description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      exam.date,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isCompleted
+                          ? const Color(0xFFD1FAE5)
+                          : const Color(0xFFE0F2FE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      exam.status,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: isCompleted
+                            ? const Color(0xFF047857)
+                            : const Color(0xFF0369A1),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (isIncoming)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3E8FF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '$daysRemaining days',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF7C3AED),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -550,12 +682,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Assignments Overview',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1F2937),
-              ),
+          style: TextStyle(
+            fontWeight: FontWeight.w400,
+            color: Color(0xFF3F3F3F),
+            fontSize: 18,
+            letterSpacing: 0.3,
+          ),
         ),
         const SizedBox(height: 12),
         Container(
@@ -574,9 +708,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildAssignmentStat('Total', '4', Colors.blue),
-              _buildAssignmentStat('Pending', '4', Colors.orange),
-              _buildAssignmentStat('Completed', '0', Colors.green),
+              _buildAssignmentStat(
+                  'Total', '$_totalAssignments', const Color(0xFF3B82F6)),
+              _buildAssignmentStat('Pending', '$_pendingAssignments',
+                  const Color(0xFFF59E0B)),
+              _buildAssignmentStat('Completed', '$_completedAssignments',
+                  const Color(0xFF10B981)),
             ],
           ),
         ),
@@ -622,37 +759,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Quick Links',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1F2937),
-              ),
+          style: TextStyle(
+            fontWeight: FontWeight.w400,
+            color: Color(0xFF3F3F3F),
+            fontSize: 18,
+            letterSpacing: 0.3,
+          ),
         ),
         const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
-              child: _buildQuickLinkCard(
-                icon: Icons.assignment,
-                label: 'Assignments',
-                color: const Color(0xFF3B82F6),
+              child: GestureDetector(
+                onTap: () => widget.onTabChange(2),
+                child: _buildQuickLinkCard(
+                  icon: Icons.assignment,
+                  label: 'Assignments',
+                  color: const Color(0xFF3B82F6),
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildQuickLinkCard(
-                icon: Icons.check_circle,
-                label: 'Tasks',
-                color: const Color(0xFF10B981),
+              child: GestureDetector(
+                onTap: () => widget.onTabChange(1),
+                child: _buildQuickLinkCard(
+                  icon: Icons.check_circle,
+                  label: 'Tasks',
+                  color: const Color(0xFF10B981),
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildQuickLinkCard(
-                icon: Icons.notifications,
-                label: 'Reminders',
-                color: const Color(0xFF8B5CF6),
+              child: GestureDetector(
+                onTap: () async {
+                  const url = 'https://calendar.google.com/calendar/u/0/r';
+                  if (await canLaunchUrl(Uri.parse(url))) {
+                    await launchUrl(Uri.parse(url));
+                  }
+                },
+                child: _buildQuickLinkCard(
+                  icon: Icons.notifications,
+                  label: 'Reminders',
+                  color: const Color(0xFF8B5CF6),
+                ),
               ),
             ),
           ],
@@ -666,37 +819,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required String label,
     required Color color,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.15),
-            color.withOpacity(0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1F2937),
-            ),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Container(
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withOpacity(0.2),
+            width: 1,
           ),
-        ],
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF3F3F3F),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -711,26 +867,7 @@ class TaskScreen extends StatefulWidget {
 }
 
 class _TaskScreenState extends State<TaskScreen> {
-  List<Task> tasks = [
-    Task(
-      title: 'Complete Project Report',
-      time: '14:00',
-      isCompleted: false,
-      priority: 'High',
-    ),
-    Task(
-      title: 'Review Code',
-      time: '16:30',
-      isCompleted: false,
-      priority: 'Medium',
-    ),
-    Task(
-      title: 'Team Meeting',
-      time: '10:00',
-      isCompleted: true,
-      priority: 'High',
-    ),
-  ];
+  List<Task> tasks = [];
 
   @override
   void initState() {
@@ -769,17 +906,20 @@ class _TaskScreenState extends State<TaskScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F7FF),
+      backgroundColor: const Color(0xFFFAF8FF),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        title: const Text('Tasks'),
+        title: const Text(
+          'Tasks',
+          style: TextStyle(
+            fontWeight: FontWeight.w300,
+            color: Color(0xFF3F3F3F),
+            fontSize: 32,
+            letterSpacing: 0.5,
+          ),
+        ),
         centerTitle: false,
-        titleTextStyle: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1F2937),
-              fontSize: 28,
-            ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -795,29 +935,54 @@ class _TaskScreenState extends State<TaskScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              ...tasks.asMap().entries.map((entry) {
-                int index = entry.key;
-                Task task = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: TaskCard(
-                    task: task,
-                    onToggle: () {
-                      setState(() {
-                        tasks[index].isCompleted = !tasks[index].isCompleted;
-                      });
-                      _saveTasks();
-                    },
-                    onEdit: () => _editTask(context, index),
-                    onDelete: () {
-                      setState(() {
-                        tasks.removeAt(index);
-                      });
-                      _saveTasks();
-                    },
+              if (tasks.isEmpty)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                );
-              }).toList(),
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: Text(
+                      'No tasks yet',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...tasks.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  Task task = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: TaskCard(
+                      task: task,
+                      onToggle: () {
+                        setState(() {
+                          tasks[index].isCompleted = !tasks[index].isCompleted;
+                        });
+                        _saveTasks();
+                      },
+                      onEdit: () => _editTask(context, index),
+                      onDelete: () {
+                        setState(() {
+                          tasks.removeAt(index);
+                        });
+                        _saveTasks();
+                      },
+                    ),
+                  );
+                }).toList(),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -826,7 +991,7 @@ class _TaskScreenState extends State<TaskScreen> {
                   icon: const Icon(Icons.add),
                   label: const Text('Add Task'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
+                    backgroundColor: const Color(0xFFD5B8E0),
                     foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 50),
                     shape: RoundedRectangleBorder(
@@ -1067,7 +1232,7 @@ class TaskCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1F2937),
+                    color: const Color(0xFF3F3F3F),
                     decoration: task.isCompleted
                         ? TextDecoration.lineThrough
                         : TextDecoration.none,
@@ -1164,6 +1329,43 @@ class Task {
   }
 }
 
+// Exam Model
+class Exam {
+  String title;
+  String description;
+  String date;
+  String status;
+  String icon;
+
+  Exam({
+    required this.title,
+    required this.description,
+    required this.date,
+    required this.status,
+    required this.icon,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'description': description,
+      'date': date,
+      'status': status,
+      'icon': icon,
+    };
+  }
+
+  factory Exam.fromJson(Map<String, dynamic> json) {
+    return Exam(
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      date: json['date'] ?? '',
+      status: json['status'] ?? 'Incoming',
+      icon: json['icon'] ?? '📝',
+    );
+  }
+}
+
 // Assignments Screen
 class AssignmentsScreen extends StatefulWidget {
   const AssignmentsScreen({Key? key}) : super(key: key);
@@ -1173,32 +1375,7 @@ class AssignmentsScreen extends StatefulWidget {
 }
 
 class _AssignmentsScreenState extends State<AssignmentsScreen> {
-  List<Assignment> assignments = [
-    Assignment(
-      name: 'for data science-2',
-      subject: 'Maths',
-      dueDate: 'December 3, 2025',
-      status: 'Not started yet',
-    ),
-    Assignment(
-      name: 'for data science-2',
-      subject: 'Statistics',
-      dueDate: 'December 3, 2025',
-      status: 'Not started yet',
-    ),
-    Assignment(
-      name: 'for foundation',
-      subject: 'Computational Thinking',
-      dueDate: 'December 3, 2025',
-      status: 'Not started yet',
-    ),
-    Assignment(
-      name: 'for foundation-2',
-      subject: 'English',
-      dueDate: 'December 3, 2025',
-      status: 'Not started yet',
-    ),
-  ];
+  List<Assignment> assignments = [];
 
   @override
   void initState() {
@@ -1228,17 +1405,20 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F7FF),
+      backgroundColor: const Color(0xFFFAF8FF),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        title: const Text('Assignments'),
+        title: const Text(
+          'Assignments',
+          style: TextStyle(
+            fontWeight: FontWeight.w300,
+            color: Color(0xFF3F3F3F),
+            fontSize: 32,
+            letterSpacing: 0.5,
+          ),
+        ),
         centerTitle: false,
-        titleTextStyle: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1F2937),
-              fontSize: 28,
-            ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -1254,23 +1434,48 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              ...assignments.asMap().entries.map((entry) {
-                int index = entry.key;
-                Assignment assignment = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: AssignmentCard(
-                    assignment: assignment,
-                    onEdit: () => _editAssignment(context, index),
-                    onDelete: () {
-                      setState(() {
-                        assignments.removeAt(index);
-                      });
-                      _saveAssignments();
-                    },
+              if (assignments.isEmpty)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                );
-              }).toList(),
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: Text(
+                      'No assignments yet',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...assignments.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  Assignment assignment = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: AssignmentCard(
+                      assignment: assignment,
+                      onEdit: () => _editAssignment(context, index),
+                      onDelete: () {
+                        setState(() {
+                          assignments.removeAt(index);
+                        });
+                        _saveAssignments();
+                      },
+                    ),
+                  );
+                }).toList(),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -1279,7 +1484,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                   icon: const Icon(Icons.add),
                   label: const Text('Add Assignment'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
+                    backgroundColor: const Color(0xFFD5B8E0),
                     foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 50),
                     shape: RoundedRectangleBorder(
@@ -1330,12 +1535,26 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: dueDateController,
+              readOnly: true,
               decoration: InputDecoration(
-                hintText: 'Due Date',
+                hintText: 'Due Date (MM/DD/YYYY)',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
+                suffixIcon: const Icon(Icons.calendar_today),
               ),
+              onTap: () async {
+                final DateTime? picked = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  dueDateController.text =
+                      DateFormat('MM/dd/yyyy').format(picked);
+                }
+              },
             ),
             const SizedBox(height: 12),
             DropdownButton<String>(
@@ -1419,12 +1638,26 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: dueDateController,
+              readOnly: true,
               decoration: InputDecoration(
-                hintText: 'Due Date',
+                hintText: 'Due Date (MM/DD/YYYY)',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
+                suffixIcon: const Icon(Icons.calendar_today),
               ),
+              onTap: () async {
+                final DateTime? picked = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  dueDateController.text =
+                      DateFormat('MM/dd/yyyy').format(picked);
+                }
+              },
             ),
             const SizedBox(height: 12),
             DropdownButton<String>(
@@ -1527,7 +1760,7 @@ class AssignmentCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1F2937),
+                        color: Color(0xFF3F3F3F),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1640,21 +1873,4 @@ class Assignment {
       status: json['status'] ?? 'Not started yet',
     );
   }
-}
-
-// Exam Data Model
-class ExamData {
-  final String title;
-  final String description;
-  final String date;
-  final String status;
-  final String icon;
-
-  ExamData({
-    required this.title,
-    required this.description,
-    required this.date,
-    required this.status,
-    required this.icon,
-  });
 }
