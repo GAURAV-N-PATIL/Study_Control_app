@@ -22,9 +22,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  late AnimationController progressController;
   final List<Widget> _screens = [
     const DashboardScreen(),
     const HabitsScreen(),
@@ -32,18 +31,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     const AssignmentsScreen(),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    progressController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 800));
-  }
-
-  void _onItemTapped(int index) {
-    setState(() => _selectedIndex = index);
-    progressController.reset();
-    progressController.forward();
-  }
+  void _onItemTapped(int index) => setState(() => _selectedIndex = index);
 
   @override
   Widget build(BuildContext context) {
@@ -54,333 +42,165 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         onTap: _onItemTapped,
         selectedItemColor: Colors.deepPurple,
         items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.checklist), label: 'Habits'),
           BottomNavigationBarItem(icon: Icon(Icons.task), label: 'Tasks'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.assignment), label: 'Assignments'),
+          BottomNavigationBarItem(icon: Icon(Icons.assignment), label: 'Assignments'),
         ],
       ),
     );
   }
 }
 
-// ------------------- DASHBOARD -------------------
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen>
-    with TickerProviderStateMixin {
-  List<Map<String, dynamic>> habits = [];
-  List<Map<String, dynamic>> tasks = [];
-  List<Map<String, dynamic>> assignments = [];
+class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin {
   List<Map<String, dynamic>> exams = [];
-  late AnimationController progressController;
   double progress = 0;
+  late AnimationController progressController;
 
   @override
   void initState() {
     super.initState();
-    progressController =
-        AnimationController(vsync: this, duration: const Duration(seconds: 1));
-    _loadAllData();
+    progressController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _loadExams();
   }
 
-  Future<void> _loadAllData() async {
+  Future<void> _loadExams() async {
     final prefs = await SharedPreferences.getInstance();
-
-    List<String>? habitTitles = prefs.getStringList('habitsTitles');
-    List<String>? habitStatus = prefs.getStringList('habitsStatus');
-    habits = [];
-    if (habitTitles != null && habitStatus != null) {
-      for (int i = 0; i < habitTitles.length; i++) {
-        habits.add({"title": habitTitles[i], "done": habitStatus[i] == "true"});
-      }
-    }
-
-    List<String>? taskTitles = prefs.getStringList('tasksTitles');
-    List<String>? taskStatus = prefs.getStringList('tasksStatus');
-    tasks = [];
-    if (taskTitles != null && taskStatus != null) {
-      for (int i = 0; i < taskTitles.length; i++) {
-        tasks.add({"title": taskTitles[i], "done": taskStatus[i] == "true"});
-      }
-    }
-
-    List<String>? assignmentTitles = prefs.getStringList('assignmentsTitles');
-    List<String>? assignmentDates = prefs.getStringList('assignmentsDates');
-    assignments = [];
-    if (assignmentTitles != null && assignmentDates != null) {
-      for (int i = 0; i < assignmentTitles.length; i++) {
-        assignments.add({
-          "title": assignmentTitles[i],
-          "deadline":
-              DateTime.fromMillisecondsSinceEpoch(int.parse(assignmentDates[i]))
-        });
-      }
-    }
-
-    List<String>? examSubjects = prefs.getStringList('examSubjects');
-    List<String>? examDates = prefs.getStringList('examDates');
+    List<String>? subjects = prefs.getStringList('examSubjects');
+    List<String>? dates = prefs.getStringList('examDates');
     exams = [];
-    if (examSubjects != null && examDates != null) {
-      for (int i = 0; i < examSubjects.length; i++) {
-        exams.add({
-          "subject": examSubjects[i],
-          "date": DateTime.fromMillisecondsSinceEpoch(int.parse(examDates[i]))
-        });
+    if (subjects != null && dates != null) {
+      for (int i = 0; i < subjects.length; i++) {
+        exams.add({"subject": subjects[i], "date": DateTime.fromMillisecondsSinceEpoch(int.parse(dates[i]))});
       }
     }
-
-    _calculateProgress();
+    setState(() {});
   }
 
-  void _calculateProgress() {
-    int completedHabits = habits.where((h) => h['done'] == true).length;
-    int completedTasks = tasks.where((t) => t['done'] == true).length;
-    double habitProgress = habits.isEmpty ? 0 : completedHabits / habits.length;
-    double taskProgress = tasks.isEmpty ? 0 : completedTasks / tasks.length;
-    setState(() {
-      progress = (habitProgress + taskProgress) / 2;
-    });
-    progressController.forward();
-  }
-
-  Color _examCardColor(int daysLeft) {
-    if (daysLeft <= 1) return Colors.redAccent.withOpacity(0.4);
-    if (daysLeft <= 3) return Colors.orangeAccent.withOpacity(0.3);
-    return Colors.white.withOpacity(0.15);
+  Future<void> _saveExams() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('examSubjects', exams.map((e) => e['subject'].toString()).toList());
+    await prefs.setStringList('examDates', exams.map((e) => (e['date'] as DateTime).millisecondsSinceEpoch.toString()).toList());
   }
 
   Future<void> _editExamDialog(int index) async {
-    TextEditingController controller =
-        TextEditingController(text: exams[index]['subject']);
+    TextEditingController controller = TextEditingController(text: exams[index]['subject']);
     DateTime tempDate = exams[index]['date'];
     await showDialog(
-        context: context,
-        builder: (context) {
-          return StatefulBuilder(builder: (context, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(labelText: "Subject"),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(children: [
-                    Text(
-                        "Date: ${tempDate.day}/${tempDate.month}/${tempDate.year}"),
-                    const Spacer(),
-                    TextButton(
-                        onPressed: () async {
-                          DateTime? picked = await showDatePicker(
-                              context: context,
-                              initialDate: tempDate,
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime(2100));
-                          if (picked != null) {
-                            setDialogState(() => tempDate = picked);
-                          }
-                        },
-                        child: const Text("Change"))
-                  ]),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                      onPressed: () async {
-                        exams[index]['subject'] = controller.text;
-                        exams[index]['date'] = tempDate;
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setStringList(
-                            'examSubjects', exams.map((e) => e['subject']).toList());
-                        await prefs.setStringList(
-                            'examDates',
-                            exams
-                                .map((e) =>
-                                    (e['date'] as DateTime).millisecondsSinceEpoch
-                                        .toString())
-                                .toList());
-                        Navigator.pop(context);
-                        setState(() {});
-                      },
-                      child: const Text("Save"))
-                ]),
-              ),
-            );
-          });
-        });
+      context: context,
+      builder: (context) => StatefulBuilder(builder: (context, setDialogState) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: controller, decoration: const InputDecoration(labelText: "Subject")),
+              const SizedBox(height: 20),
+              Row(children: [
+                Text("Date: ${tempDate.day}/${tempDate.month}/${tempDate.year}"),
+                const Spacer(),
+                TextButton(
+                    onPressed: () async {
+                      DateTime? picked = await showDatePicker(context: context, initialDate: tempDate, firstDate: DateTime.now(), lastDate: DateTime(2100));
+                      if (picked != null) setDialogState(() => tempDate = picked);
+                    },
+                    child: const Text("Change"))
+              ]),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                  onPressed: () {
+                    exams[index]['subject'] = controller.text;
+                    exams[index]['date'] = tempDate;
+                    _saveExams();
+                    Navigator.pop(context);
+                    setState(() {});
+                  },
+                  child: const Text("Save"))
+            ]),
+          ),
+        );
+      }),
+    );
   }
 
   Widget _examCard(String subject, DateTime date) {
     int daysLeft = date.difference(DateTime.now()).inDays;
+    Color color = daysLeft <= 1 ? Colors.redAccent.withOpacity(0.3) : daysLeft <= 3 ? Colors.orangeAccent.withOpacity(0.2) : Colors.white;
     return Dismissible(
       key: UniqueKey(),
-      onDismissed: (_) async {
+      onDismissed: (_) {
         exams.removeWhere((e) => e['subject'] == subject);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setStringList(
-            'examSubjects', exams.map((e) => e['subject']).toList());
-        await prefs.setStringList(
-            'examDates',
-            exams
-                .map((e) =>
-                    (e['date'] as DateTime).millisecondsSinceEpoch.toString())
-                .toList());
+        _saveExams();
         setState(() {});
       },
-      background: Container(
-        color: Colors.redAccent,
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: 20),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
+      background: Container(color: Colors.redAccent, alignment: Alignment.centerLeft, padding: const EdgeInsets.only(left: 20), child: const Icon(Icons.delete, color: Colors.white)),
       child: InkWell(
         onTap: () => _editExamDialog(exams.indexWhere((e) => e['subject'] == subject)),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: _examCardColor(daysLeft),
-            borderRadius: BorderRadius.circular(25),
-            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
-          ),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Upcoming Test",
-                    style: TextStyle(color: Colors.black54, fontSize: 14)),
-                const SizedBox(height: 8),
-                Text("$subject • $daysLeft days left",
-                    style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold))
-              ]),
-        ),
+        child: AnimatedContainer(duration: const Duration(milliseconds: 300), padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(subject, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)), Text("$daysLeft days left", style: const TextStyle(color: Colors.black54))])),
       ),
     );
   }
 
   Widget _progressCard() {
     return AnimatedBuilder(
-        animation: progressController,
-        builder: (context, child) {
-          return Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)]),
-            child: Row(children: [
-              SizedBox(
-                height: 90,
-                width: 90,
-                child: Stack(alignment: Alignment.center, children: [
-                  CircularProgressIndicator(
-                    value: progressController.value * progress,
-                    strokeWidth: 8,
-                    backgroundColor: Colors.grey[300],
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(Colors.deepPurple),
-                  ),
-                  Text("${((progressController.value * progress) * 100).toInt()}%",
-                      style: const TextStyle(
-                          color: Colors.black, fontWeight: FontWeight.bold))
-                ]),
-              ),
-              const SizedBox(width: 20),
-              const Expanded(
-                  child: Text("Today's Overall Progress\n(Habits + Tasks)",
-                      style: TextStyle(color: Colors.black, fontSize: 16))),
-            ]),
-          );
-        });
-  }
-
-  Widget _infoCard(String title, String content) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)]),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(color: Colors.black54, fontSize: 14)),
-        const SizedBox(height: 6),
-        Text(content,
-            style: const TextStyle(
-                color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold))
-      ]),
+      animation: progressController,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)]),
+          child: Row(children: [
+            SizedBox(
+              height: 80,
+              width: 80,
+              child: Stack(alignment: Alignment.center, children: [
+                CircularProgressIndicator(value: progressController.value * progress, strokeWidth: 8, backgroundColor: Colors.grey[300], valueColor: const AlwaysStoppedAnimation<Color>(Colors.deepPurple)),
+                Text("${(progressController.value * progress * 100).toInt()}%", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
+              ]),
+            ),
+            const SizedBox(width: 20),
+            const Expanded(child: Text("Today's Progress", style: TextStyle(color: Colors.black, fontSize: 16)))
+          ]),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-          gradient: LinearGradient(
-              colors: [Color(0xFFD1C4E9), Color(0xFFB39DDB)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight)),
-      child: SafeArea(
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFD1C4E9), Color(0xFFB39DDB)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+        child: SafeArea(
           child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: ListView(
-          children: [
-            const SizedBox(height: 20),
-            const Text("Dashboard",
-                style: TextStyle(
-                    color: Colors.black87,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold)),
-            const SizedBox(height: 30),
-            _progressCard(),
-            const SizedBox(height: 20),
-            _infoCard(
-                "Assignments",
-                "${assignments.length} Total • ${tasks.where((t) => t['done'] == true).length} Completed"),
-            const SizedBox(height: 20),
-            const Text("Upcoming Exams",
-                style: TextStyle(
-                    color: Colors.black87,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold)),
-            const SizedBox(height: 15),
-            ...exams.map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 15),
-                  child: _examCard(e['subject'], e['date']),
-                )),
-          ],
+            padding: const EdgeInsets.all(20),
+            child: ListView(children: [
+              const SizedBox(height: 20),
+              const Text("Dashboard", style: TextStyle(color: Colors.black87, fontSize: 28, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              _progressCard(),
+              const SizedBox(height: 20),
+              ...exams.map((e) => Padding(padding: const EdgeInsets.only(bottom: 15), child: _examCard(e['subject'], e['date'])))
+            ]),
+          ),
         ),
-      )),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          exams.add({"subject": "New Subject", "date": DateTime.now().add(const Duration(days: 7))});
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setStringList(
-              'examSubjects', exams.map((e) => e['subject']).toList());
-          await prefs.setStringList(
-              'examDates',
-              exams
-                  .map((e) =>
-                      (e['date'] as DateTime).millisecondsSinceEpoch.toString())
-                  .toList());
-          setState(() {});
-        },
-        child: const Icon(Icons.add),
       ),
+      floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            exams.add({"subject": "New Subject", "date": DateTime.now().add(const Duration(days: 7))});
+            _saveExams();
+            setState(() {});
+          },
+          child: const Icon(Icons.add)),
     );
   }
 }
 
-// ------------------- HABITS SCREEN -------------------
 class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
   @override
@@ -411,75 +231,56 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
   Future<void> _saveHabits() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-        'habitsTitles', habits.map((h) => h['title'] as String).toList());
-    await prefs.setStringList(
-        'habitsStatus', habits.map((h) => (h['done'] as bool).toString()).toList());
+    await prefs.setStringList('habitsTitles', habits.map((h) => h['title'].toString()).toList());
+    await prefs.setStringList('habitsStatus', habits.map((h) => h['done'].toString()).toList());
   }
 
   void _addHabit() {
-    setState(() => habits.add({"title": "New Habit", "done": false}));
+    habits.add({"title": "New Habit", "done": false});
     _saveHabits();
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-          gradient: LinearGradient(
-              colors: [Color(0xFFFFCDD2), Color(0xFFFFAB91)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight)),
-      child: SafeArea(
-          child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: ListView(children: [
-          const SizedBox(height: 20),
-          const Text("Habits",
-              style: TextStyle(
-                  color: Colors.black87, fontSize: 28, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          ...habits.map((habit) {
-            return Dismissible(
-              key: UniqueKey(),
-              onDismissed: (_) {
-                habits.remove(habit);
-                _saveHabits();
-                setState(() {});
-              },
-              background: Container(
-                  color: Colors.redAccent,
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.only(left: 20),
-                  child: const Icon(Icons.delete, color: Colors.white)),
-              child: Card(
-                color: Colors.white,
-                elevation: 4,
-                child: ListTile(
-                  title: Text(habit['title'], style: const TextStyle(color: Colors.black)),
-                  trailing: Checkbox(
-                    value: habit['done'],
-                    onChanged: (val) {
-                      habit['done'] = val;
-                      _saveHabits();
-                      setState(() {});
-                    },
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ]),
-      )),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addHabit,
-        child: const Icon(Icons.add),
-      ),
+    return Scaffold(
+      body: Container(
+          decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFE1BEE7), Color(0xFFF8BBD0)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+          child: SafeArea(
+              child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: ListView(children: [
+                    const SizedBox(height: 20),
+                    const Text("Habits", style: TextStyle(color: Colors.black87, fontSize: 28, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 20),
+                    ...habits.map((h) => Dismissible(
+                        key: UniqueKey(),
+                        onDismissed: (_) {
+                          habits.remove(h);
+                          _saveHabits();
+                          setState(() {});
+                        },
+                        background: Container(color: Colors.redAccent, alignment: Alignment.centerLeft, padding: const EdgeInsets.only(left: 20), child: const Icon(Icons.delete, color: Colors.white)),
+                        child: Card(
+                            color: Colors.white,
+                            elevation: 3,
+                            child: ListTile(
+                              title: Text(h['title'], style: const TextStyle(color: Colors.black)),
+                              trailing: Checkbox(
+                                value: h['done'],
+                                onChanged: (val) {
+                                  h['done'] = val;
+                                  _saveHabits();
+                                  setState(() {});
+                                },
+                              ),
+                            ))))
+                  ])))),
+      floatingActionButton: FloatingActionButton(onPressed: _addHabit, child: const Icon(Icons.add)),
     );
   }
 }
 
-// ------------------- TASKS SCREEN -------------------
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
   @override
@@ -510,77 +311,56 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Future<void> _saveTasks() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('tasksTitles', tasks.map((t) => t['title'] as String).toList());
-    await prefs.setStringList('tasksStatus', tasks.map((t) => (t['done'] as bool).toString()).toList());
+    await prefs.setStringList('tasksTitles', tasks.map((t) => t['title'].toString()).toList());
+    await prefs.setStringList('tasksStatus', tasks.map((t) => t['done'].toString()).toList());
   }
 
   void _addTask() {
-    setState(() => tasks.add({"title": "New Task", "done": false}));
+    tasks.add({"title": "New Task", "done": false});
     _saveTasks();
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-          gradient: LinearGradient(
-              colors: [Color(0xFF80CBC4), Color(0xFF4DB6AC)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight)),
-      child: SafeArea(
-          child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: ListView(
-          children: [
-            const SizedBox(height: 20),
-            const Text("Tasks",
-                style: TextStyle(
-                    color: Colors.black87,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            ...tasks.map((task) {
-              return Dismissible(
-                key: UniqueKey(),
-                onDismissed: (_) {
-                  tasks.remove(task);
-                  _saveTasks();
-                  setState(() {});
-                },
-                background: Container(
-                    color: Colors.redAccent,
-                    alignment: Alignment.centerLeft,
-                    padding: const EdgeInsets.only(left: 20),
-                    child: const Icon(Icons.delete, color: Colors.white)),
-                child: Card(
-                  color: Colors.white,
-                  elevation: 4,
-                  child: ListTile(
-                    title: Text(task['title'], style: const TextStyle(color: Colors.black)),
-                    trailing: Checkbox(
-                      value: task['done'],
-                      onChanged: (val) {
-                        task['done'] = val;
-                        _saveTasks();
-                        setState(() {});
-                      },
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ],
-        ),
-      )),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addTask,
-        child: const Icon(Icons.add),
-      ),
+    return Scaffold(
+      body: Container(
+          decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFB2DFDB), Color(0xFF80CBC4)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+          child: SafeArea(
+              child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: ListView(children: [
+                    const SizedBox(height: 20),
+                    const Text("Tasks", style: TextStyle(color: Colors.black87, fontSize: 28, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 20),
+                    ...tasks.map((t) => Dismissible(
+                        key: UniqueKey(),
+                        onDismissed: (_) {
+                          tasks.remove(t);
+                          _saveTasks();
+                          setState(() {});
+                        },
+                        background: Container(color: Colors.redAccent, alignment: Alignment.centerLeft, padding: const EdgeInsets.only(left: 20), child: const Icon(Icons.delete, color: Colors.white)),
+                        child: Card(
+                            color: Colors.white,
+                            elevation: 3,
+                            child: ListTile(
+                              title: Text(t['title'], style: const TextStyle(color: Colors.black)),
+                              trailing: Checkbox(
+                                value: t['done'],
+                                onChanged: (val) {
+                                  t['done'] = val;
+                                  _saveTasks();
+                                  setState(() {});
+                                },
+                              ),
+                            ))))
+                  ])))),
+      floatingActionButton: FloatingActionButton(onPressed: _addTask, child: const Icon(Icons.add)),
     );
   }
 }
 
-// ------------------- ASSIGNMENTS SCREEN -------------------
 class AssignmentsScreen extends StatefulWidget {
   const AssignmentsScreen({super.key});
   @override
@@ -614,124 +394,95 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
 
   Future<void> _saveAssignments() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-        'assignmentsTitles', assignments.map((a) => a['title'] as String).toList());
-    await prefs.setStringList(
-        'assignmentsDates',
-        assignments
-            .map((a) => (a['deadline'] as DateTime).millisecondsSinceEpoch.toString())
-            .toList());
+    await prefs.setStringList('assignmentsTitles', assignments.map((a) => a['title'].toString()).toList());
+    await prefs.setStringList('assignmentsDates', assignments.map((a) => (a['deadline'] as DateTime).millisecondsSinceEpoch.toString()).toList());
   }
 
   void _addAssignment() {
-    setState(() => assignments.add({
-          "title": "New Assignment",
-          "deadline": DateTime.now().add(const Duration(days: 7))
-        }));
+    assignments.add({"title": "New Assignment", "deadline": DateTime.now().add(const Duration(days: 7))});
     _saveAssignments();
+    setState(() {});
+  }
+
+  Future<void> _editAssignmentDialog(int index) async {
+    TextEditingController controller = TextEditingController(text: assignments[index]['title']);
+    DateTime tempDate = assignments[index]['deadline'];
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(builder: (context, setDialogState) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: controller, decoration: const InputDecoration(labelText: "Title")),
+              const SizedBox(height: 20),
+              Row(children: [
+                Text("Deadline: ${tempDate.day}/${tempDate.month}/${tempDate.year}"),
+                const Spacer(),
+                TextButton(
+                    onPressed: () async {
+                      DateTime? picked = await showDatePicker(context: context, initialDate: tempDate, firstDate: DateTime.now(), lastDate: DateTime(2100));
+                      if (picked != null) setDialogState(() => tempDate = picked);
+                    },
+                    child: const Text("Change"))
+              ]),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                  onPressed: () {
+                    assignments[index]['title'] = controller.text;
+                    assignments[index]['deadline'] = tempDate;
+                    _saveAssignments();
+                    Navigator.pop(context);
+                    setState(() {});
+                  },
+                  child: const Text("Save"))
+            ]),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _assignmentCard(String title, DateTime deadline) {
+    int daysLeft = deadline.difference(DateTime.now()).inDays;
+    return Dismissible(
+      key: UniqueKey(),
+      onDismissed: (_) {
+        assignments.removeWhere((a) => a['title'] == title);
+        _saveAssignments();
+        setState(() {});
+      },
+      background: Container(color: Colors.redAccent, alignment: Alignment.centerLeft, padding: const EdgeInsets.only(left: 20), child: const Icon(Icons.delete, color: Colors.white)),
+      child: InkWell(
+        onTap: () => _editAssignmentDialog(assignments.indexWhere((a) => a['title'] == title)),
+        child: Card(
+          color: Colors.white,
+          elevation: 3,
+          child: ListTile(
+            title: Text(title, style: const TextStyle(color: Colors.black)),
+            subtitle: Text("$daysLeft days left"),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-          gradient: LinearGradient(
-              colors: [Color(0xFFBBDEFB), Color(0xFF90CAF9)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight)),
-      child: SafeArea(
-          child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: ListView(children: [
-          const SizedBox(height: 20),
-          const Text("Assignments",
-              style: TextStyle(
-                  color: Colors.black87, fontSize: 28, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          ...assignments.map((assignment) {
-            int daysLeft = assignment['deadline'].difference(DateTime.now()).inDays;
-            return Dismissible(
-              key: UniqueKey(),
-              onDismissed: (_) {
-                assignments.remove(assignment);
-                _saveAssignments();
-                setState(() {});
-              },
-              background: Container(
-                  color: Colors.redAccent,
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.only(left: 20),
-                  child: const Icon(Icons.delete, color: Colors.white)),
-              child: InkWell(
-                onTap: () async {
-                  TextEditingController controller =
-                      TextEditingController(text: assignment['title']);
-                  DateTime tempDate = assignment['deadline'];
-                  await showDialog(
-                      context: context,
-                      builder: (context) {
-                        return StatefulBuilder(builder: (context, setStateDialog) {
-                          return Dialog(
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20)),
-                            child: Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                                TextField(
-                                  controller: controller,
-                                  decoration: const InputDecoration(labelText: "Title"),
-                                ),
-                                const SizedBox(height: 20),
-                                Row(children: [
-                                  Text(
-                                      "Deadline: ${tempDate.day}/${tempDate.month}/${tempDate.year}"),
-                                  const Spacer(),
-                                  TextButton(
-                                      onPressed: () async {
-                                        DateTime? picked = await showDatePicker(
-                                            context: context,
-                                            initialDate: tempDate,
-                                            firstDate: DateTime.now(),
-                                            lastDate: DateTime(2100));
-                                        if (picked != null) {
-                                          setStateDialog(() => tempDate = picked);
-                                        }
-                                      },
-                                      child: const Text("Change"))
-                                ]),
-                                const SizedBox(height: 20),
-                                ElevatedButton(
-                                    onPressed: () {
-                                      assignment['title'] = controller.text;
-                                      assignment['deadline'] = tempDate;
-                                      _saveAssignments();
-                                      Navigator.pop(context);
-                                      setState(() {});
-                                    },
-                                    child: const Text("Save"))
-                              ]),
-                            ),
-                          );
-                        });
-                      });
-                },
-                child: Card(
-                  color: Colors.white,
-                  elevation: 4,
-                  child: ListTile(
-                    title: Text(assignment['title'], style: const TextStyle(color: Colors.black)),
-                    subtitle: Text("$daysLeft days left"),
-                  ),
-                ),
-              ),
-            );
-          }).toList()
-        ]),
-      )),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addAssignment,
-        child: const Icon(Icons.add),
-      ),
+    return Scaffold(
+      body: Container(
+          decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFB39DDB), Color(0xFFD1C4E9)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+          child: SafeArea(
+              child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: ListView(children: [
+                    const SizedBox(height: 20),
+                    const Text("Assignments", style: TextStyle(color: Colors.black87, fontSize: 28, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 20),
+                    ...assignments.map((a) => Padding(padding: const EdgeInsets.only(bottom: 15), child: _assignmentCard(a['title'], a['deadline'])))
+                  ])))),
+      floatingActionButton: FloatingActionButton(onPressed: _addAssignment, child: const Icon(Icons.add)),
     );
   }
 }
