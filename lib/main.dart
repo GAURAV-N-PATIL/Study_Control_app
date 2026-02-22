@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart';
 
 void main() {
   runApp(const StudyControlApp());
@@ -29,7 +27,6 @@ class StudyControlApp extends StatelessWidget {
   }
 }
 
-// Main Screen with Bottom Navigation
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
 
@@ -93,7 +90,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// Dashboard Screen - Completely Redesigned
 class DashboardScreen extends StatefulWidget {
   final Function(int) onTabChange;
 
@@ -175,12 +171,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   int _getDaysRemaining(String dateString) {
     try {
-      final date = DateFormat('MMMM d, yyyy').parse(dateString);
-      final now = DateTime.now();
-      return date.difference(now).inDays;
+      final parts = dateString.split('/');
+      if (parts.length == 3) {
+        final month = int.parse(parts[0]);
+        final day = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+        final date = DateTime(year, month, day);
+        final now = DateTime.now();
+        return date.difference(now).inDays;
+      }
     } catch (e) {
-      return 0;
+      // Handle error silently
     }
+    return 0;
   }
 
   @override
@@ -192,7 +195,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
                 child: Column(
@@ -219,29 +221,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
-
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Task Progress Card
                     _buildTaskProgressCard(),
                     const SizedBox(height: 24),
-
-                    // Today's Tasks Section
                     _buildTodayTasksSection(),
                     const SizedBox(height: 24),
-
-                    // Upcoming Exams Section
                     _buildUpcomingExamsSection(),
                     const SizedBox(height: 24),
-
-                    // Assignments Overview
                     _buildAssignmentsOverviewSection(),
                     const SizedBox(height: 24),
-
-                    // Quick Links
                     _buildQuickLinksSection(),
                     const SizedBox(height: 20),
                   ],
@@ -551,128 +543,124 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildExamCard(Exam exam) {
     final daysRemaining = _getDaysRemaining(exam.date);
     final isCompleted = exam.status == 'Completed';
-    final isIncoming = exam.status == 'Incoming' && daysRemaining > 0;
 
-    return GestureDetector(
-      onHover: (isHovering) {},
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0F9FF),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isCompleted
-                  ? const Color(0xFFD1FAE5).withOpacity(0.5)
-                  : const Color(0xFFBAE6FD).withOpacity(0.5),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F9FF),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isCompleted
+                ? const Color(0xFFD1FAE5).withOpacity(0.5)
+                : const Color(0xFFBAE6FD).withOpacity(0.5),
+            width: 1.5,
           ),
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isCompleted
-                      ? const Color(0xFFD1FAE5)
-                      : const Color(0xFFE0F2FE),
-                ),
-                child: Center(
-                  child: Text(exam.icon, style: const TextStyle(fontSize: 24)),
-                ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isCompleted
+                    ? const Color(0xFFD1FAE5)
+                    : const Color(0xFFE0F2FE),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exam.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF3F3F3F),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      exam.description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      exam.date,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
+              child: Center(
+                child: Text(exam.icon, style: const TextStyle(fontSize: 24)),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? const Color(0xFFD1FAE5)
-                          : const Color(0xFFE0F2FE),
-                      borderRadius: BorderRadius.circular(8),
+                  Text(
+                    exam.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF3F3F3F),
                     ),
-                    child: Text(
-                      exam.status,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: isCompleted
-                            ? const Color(0xFF047857)
-                            : const Color(0xFF0369A1),
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    exam.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  if (isIncoming)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3E8FF),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '$daysRemaining days',
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF7C3AED),
-                        ),
-                      ),
+                  Text(
+                    exam.date,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w400,
                     ),
+                  ),
                 ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isCompleted
+                        ? const Color(0xFFD1FAE5)
+                        : const Color(0xFFE0F2FE),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    exam.status,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: isCompleted
+                          ? const Color(0xFF047857)
+                          : const Color(0xFF0369A1),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                if (daysRemaining > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3E8FF),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '$daysRemaining days',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF7C3AED),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -795,11 +783,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: GestureDetector(
-                onTap: () async {
-                  const url = 'https://calendar.google.com/calendar/u/0/r';
-                  if (await canLaunchUrl(Uri.parse(url))) {
-                    await launchUrl(Uri.parse(url));
-                  }
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'Opening Google Calendar in browser...'),
+                    ),
+                  );
+                  // For web: use html.window.open()
+                  // For mobile: consider using native implementation
                 },
                 child: _buildQuickLinkCard(
                   icon: Icons.notifications,
@@ -858,7 +850,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-// Task Screen
 class TaskScreen extends StatefulWidget {
   const TaskScreen({Key? key}) : super(key: key);
 
@@ -1153,7 +1144,6 @@ class _TaskScreenState extends State<TaskScreen> {
   }
 }
 
-// Task Card Widget
 class TaskCard extends StatelessWidget {
   final Task task;
   final VoidCallback onToggle;
@@ -1296,7 +1286,6 @@ class TaskCard extends StatelessWidget {
   }
 }
 
-// Task Model
 class Task {
   String title;
   String time;
@@ -1329,7 +1318,6 @@ class Task {
   }
 }
 
-// Exam Model
 class Exam {
   String title;
   String description;
@@ -1366,7 +1354,6 @@ class Exam {
   }
 }
 
-// Assignments Screen
 class AssignmentsScreen extends StatefulWidget {
   const AssignmentsScreen({Key? key}) : super(key: key);
 
@@ -1552,7 +1539,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                 );
                 if (picked != null) {
                   dueDateController.text =
-                      DateFormat('MM/dd/yyyy').format(picked);
+                      '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
                 }
               },
             ),
@@ -1655,7 +1642,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                 );
                 if (picked != null) {
                   dueDateController.text =
-                      DateFormat('MM/dd/yyyy').format(picked);
+                      '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
                 }
               },
             ),
@@ -1700,7 +1687,6 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   }
 }
 
-// Assignment Card Widget
 class AssignmentCard extends StatelessWidget {
   final Assignment assignment;
   final VoidCallback onEdit;
@@ -1842,7 +1828,6 @@ class AssignmentCard extends StatelessWidget {
   }
 }
 
-// Assignment Model
 class Assignment {
   String name;
   String subject;
